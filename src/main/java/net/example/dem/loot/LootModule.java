@@ -174,7 +174,7 @@ public class LootModule {
         if (online != null) {
             Location loc = online.getLocation();
             return new PlaceholderContext(playerName, loc.getWorld().getName(),
-                    loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+                    loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), online);
         }
         return PlaceholderContext.ofPlayerOnly(playerName);
     }

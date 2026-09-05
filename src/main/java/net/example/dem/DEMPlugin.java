@@ -22,10 +22,10 @@ public class DEMPlugin extends JavaPlugin {
         // --- Módulo de Áreas ---
         areaManager = new AreaManager(this);
         areaManager.load();
-        SelectionListener selectionListener = new SelectionListener();
+        SelectionListener selectionListener = new SelectionListener(this);
         getServer().getPluginManager().registerEvents(selectionListener, this);
         getServer().getPluginManager().registerEvents(new AreaMoveListener(this, areaManager), this);
-        AreaModule areaModule = new AreaModule(areaManager, selectionListener);
+        AreaModule areaModule = new AreaModule(this, areaManager, selectionListener);
 
         // --- Módulo de Objetivos ---
         objectiveManager = new ObjectiveManager();

@@ -63,7 +63,7 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
     private void runCommands(List<String> commands, Player player, Location loc) {
         PlaceholderContext context = new PlaceholderContext(
                 player.getName(), loc.getWorld().getName(),
-                loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+                loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), player);
         CommandRunner.runAll(plugin, commands, context);
     }
 }
