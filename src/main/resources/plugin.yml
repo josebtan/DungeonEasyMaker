@@ -15,6 +15,7 @@ commands:
       /dungeonarea remove <nombre>
       /dungeonarea list
       /dungeonarea info <nombre>
+      /dungeonarea reload
     permission: dungeoncore.admin
     permission-message: No tienes permiso para usar este comando.
 
@@ -35,6 +36,7 @@ commands:
       /dungeonloot removeentry <tabla> <indice>
       /dungeonloot list <tabla>
       /dungeonloot roll <tabla> <jugador>
+      /dungeonloot reload
     permission: dungeoncore.admin
     permission-message: No tienes permiso para usar este comando.
 

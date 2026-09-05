@@ -49,6 +49,15 @@ public class AreaManager {
         }
     }
 
+    /**
+     * Vuelve a leer areas.yml desde disco, descartando lo que había en memoria.
+     * Útil cuando editas el archivo a mano y no quieres reiniciar el servidor.
+     */
+    public void reload() {
+        areas.clear();
+        load();
+    }
+
     public void save() {
         if (file == null) {
             file = new File(plugin.getDataFolder(), "areas.yml");

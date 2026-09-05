@@ -78,6 +78,15 @@ public class LootManager {
         return table;
     }
 
+    /**
+     * Vuelve a leer loot.yml desde disco, descartando lo que había en memoria.
+     * Útil cuando editas el archivo a mano y no quieres reiniciar el servidor.
+     */
+    public void reload() {
+        tables.clear();
+        load();
+    }
+
     public LootTable getTable(String name) {
         return tables.get(name.toLowerCase());
     }
