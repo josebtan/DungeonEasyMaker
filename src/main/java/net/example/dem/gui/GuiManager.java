@@ -174,7 +174,7 @@ public class GuiManager {
 
         inv.setItem(15, buildItem(Material.NETHER_STAR,
                 ChatColor.LIGHT_PURPLE + "Comandos de arranque (" + area.getStartCommands().size() + ")",
-                List.of(ChatColor.GRAY + "Corren 1 vez por jugador al",
+                List.of(ChatColor.GRAY + "Corren 1 sola vez al",
                         ChatColor.GRAY + "cerrar la ventana de ingreso"),
                 "open_start", area.getName(), null));
 

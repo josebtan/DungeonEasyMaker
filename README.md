@@ -25,18 +25,19 @@ Cada área puede tener una "ventana de ingreso" opcional:
 2. Mientras corre la cuenta, otros jugadores pueden sumarse entrando al área.
 3. Al terminar el tiempo, el área se **bloquea**: nadie más puede entrar hasta
    que quede vacía de nuevo.
-4. Los comandos de `addstart` se ejecutan **una vez por cada jugador** que
-   entró durante la ventana. Si el comando spawnea mobs, eso multiplica la
-   cantidad de enemigos según cuántos jugadores se unieron.
+4. Los comandos de `addstart` se ejecutan **una sola vez**, tal como están
+   escritos (no se multiplican por la cantidad de jugadores que entraron).
 
 ```
 /dem area setwindow nivel1 15
 /dem area addstarthere cmi spawnmob zombie;hp{20} 3 [player]
 ```
 
-Con el ejemplo de arriba: si entran 2 jugadores durante los 15 segundos, el
-comando corre 2 veces (una por jugador), spawneando 3 zombis para cada uno
-(6 en total). `[player]` se resuelve distinto en cada ejecución.
+Con el ejemplo de arriba, sin importar si entraron 1 o 4 jugadores durante
+los 15 segundos, el comando corre una sola vez tal cual está escrito
+(3 zombis, siempre). Si querés que la dificultad varíe según cuántos entren,
+tenés que escribir vos la lógica en el comando (por ejemplo con distintos
+`addstart` según cómo lo configures manualmente), DEM no lo hace automático.
 
 - `setwindow <nombre> 0` desactiva la ventana; el área vuelve a comportarse
   como antes (los `enter-commands` corren normal, uno por jugador, al momento

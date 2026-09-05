@@ -22,8 +22,8 @@ public class DungeonArea {
     // --- Ventana de ingreso (cuenta regresiva por cantidad de jugadores) ---
     // 0 = desactivada: los enterCommands corren normal, uno a uno, como siempre.
     private int joinWindowSeconds = 0;
-    // Comandos que se ejecutan una vez por cada jugador que entró durante la
-    // ventana, al cerrarse (así "se multiplican" según cuántos entraron).
+    // Comandos que se ejecutan una vez cuando se cierra la ventana de ingreso
+    // (tal como están escritos, sin multiplicar por cantidad de jugadores).
     private final List<String> startCommands = new ArrayList<>();
 
     // Estado en vivo de la ventana. No se persiste en areas.yml: siempre

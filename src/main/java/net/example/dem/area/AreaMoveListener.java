@@ -25,8 +25,8 @@ import java.util.UUID;
  * Además maneja la "ventana de ingreso" opcional (area.getJoinWindowSeconds() > 0):
  * al entrar el primer jugador arranca una cuenta regresiva para que se sumen más;
  * al terminar, el área se bloquea (no se puede entrar más) y los comandos de
- * "addstart" se ejecutan una vez POR CADA jugador que entró durante la ventana,
- * lo que en la práctica multiplica los spawns/loot/etc. según cuántos se unieron.
+ * "addstart" se ejecutan UNA sola vez, tal como están escritos (no se multiplican
+ * por la cantidad de jugadores que entraron).
  */
 public class AreaMoveListener implements org.bukkit.event.Listener {
 
@@ -115,7 +115,7 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
         }
     }
 
-    /** Se dispara cuando termina la cuenta regresiva: cierra y ejecuta addstart x jugador. */
+    /** Se dispara cuando termina la cuenta regresiva: cierra la ventana y ejecuta addstart. */
     private void closeWindow(DungeonArea area) {
         area.setWindowOpen(false);
         area.setLocked(true);
@@ -133,17 +133,23 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
         Bukkit.broadcastMessage(ChatColor.GOLD + "[DEM] '" + area.getName()
                 + "' comenzó con " + count + " jugador(es).");
 
-        for (UUID uuid : joiners) {
-            Player joined = Bukkit.getPlayer(uuid);
-            if (joined == null || !joined.isOnline()) continue;
-            Location loc = joined.getLocation();
-            PlaceholderContext context = new PlaceholderContext(
-                    joined.getName(), loc.getWorld().getName(),
-                    loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), joined);
-            // Se ejecuta la lista completa de addstart por cada jugador: si el
-            // comando spawnea 3 mobs y entraron 2 jugadores, terminan siendo 6.
-            CommandRunner.runAll(plugin, area.getStartCommands(), context);
+        // Los comandos de "addstart" corren UNA sola vez, tal como están escritos
+        // (no se multiplican por la cantidad de jugadores que entraron).
+        Player reference = joiners.stream()
+                .map(Bukkit::getPlayer)
+                .filter(p -> p != null && p.isOnline())
+                .findFirst()
+                .orElse(null);
+
+        PlaceholderContext context;
+        if (reference != null) {
+            Location loc = reference.getLocation();
+            context = new PlaceholderContext(reference.getName(), loc.getWorld().getName(),
+                    loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), reference);
+        } else {
+            context = PlaceholderContext.ofPlayerOnly("");
         }
+        CommandRunner.runAll(plugin, area.getStartCommands(), context);
     }
 
     private void runCommands(List<String> commands, Player player, Location loc) {

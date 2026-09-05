@@ -84,7 +84,7 @@ public class AreaModule {
         sender.sendMessage(ChatColor.RED + "/dem area addenterhere <comando>  (usa el área seleccionada o donde estás parado)");
         sender.sendMessage(ChatColor.RED + "/dem area addleavehere <comando>");
         sender.sendMessage(ChatColor.RED + "/dem area setwindow <nombre> <segundos>  (0 = desactivar)");
-        sender.sendMessage(ChatColor.RED + "/dem area addstart <nombre> <comando>  (corre 1 vez por jugador al cerrar la ventana)");
+        sender.sendMessage(ChatColor.RED + "/dem area addstart <nombre> <comando>  (corre 1 vez al cerrar la ventana)");
         sender.sendMessage(ChatColor.RED + "/dem area addstarthere <comando>");
         sender.sendMessage(ChatColor.RED + "/dem area select <nombre>");
         sender.sendMessage(ChatColor.RED + "/dem area unselect");
@@ -96,7 +96,7 @@ public class AreaModule {
         sender.sendMessage(ChatColor.GRAY + "Placeholders disponibles en los comandos: [player] [world] [x] [y] [z] (+ PlaceholderAPI si está instalado)");
         sender.sendMessage(ChatColor.GRAY + "Delay opcional: \"delay:<segundos>|<comando>\"");
         sender.sendMessage(ChatColor.GRAY + "Ventana de ingreso: al entrar el 1er jugador arranca la cuenta regresiva "
-                + "(setwindow); al cerrarse, addstart corre 1 vez por cada jugador dentro (multiplica spawns) "
+                + "(setwindow); al cerrarse, addstart corre 1 sola vez tal como está escrito "
                 + "y el área se bloquea hasta que quede vacía.");
     }
 
@@ -215,8 +215,8 @@ public class AreaModule {
         } else {
             sender.sendMessage(ChatColor.GREEN + "Ventana de ingreso de '" + area.getName() + "' establecida en "
                     + area.getJoinWindowSeconds() + " segundos. Al entrar el primer jugador arranca la cuenta "
-                    + "regresiva; al terminar, se bloquea la entrada y los comandos de 'addstart' corren una "
-                    + "vez por cada jugador que se haya unido.");
+                    + "regresiva; al terminar, se bloquea la entrada y los comandos de 'addstart' corren "
+                    + "una sola vez, tal como están escritos.");
         }
         return true;
     }
@@ -237,7 +237,7 @@ public class AreaModule {
     }
 
     // /dem area addstarthere <comando...> — igual que addenterhere pero para la
-    // lista de comandos "de arranque" (los que se multiplican por jugador).
+    // lista de comandos "de arranque" (se disparan al cerrarse la ventana).
     private boolean handleAddStartHere(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(ChatColor.RED + "Uso: /dem area addstarthere <comando>");
@@ -260,7 +260,7 @@ public class AreaModule {
                     + "así que este comando nunca se va a ejecutar)"
                 : "";
         sender.sendMessage(ChatColor.GREEN + "Comando de arranque agregado a '" + area.getName()
-                + "' (corre una vez por jugador al cerrar la ventana): " + commandText + windowNote);
+                + "' (corre 1 sola vez al cerrar la ventana): " + commandText + windowNote);
     }
 
     /**
@@ -421,7 +421,7 @@ public class AreaModule {
 
         if (area.getJoinWindowSeconds() > 0) {
             sender.sendMessage(ChatColor.AQUA + "Ventana de ingreso: " + area.getJoinWindowSeconds() + "s");
-            sender.sendMessage(ChatColor.AQUA + "Comandos de arranque (x jugador):");
+            sender.sendMessage(ChatColor.AQUA + "Comandos de arranque (corren 1 sola vez):");
             area.getStartCommands().forEach(c -> sender.sendMessage(ChatColor.GRAY + " - " + c));
             String estado = area.isLocked() ? ("bloqueada, " + area.getJoiners().size() + " jugador(es) dentro")
                     : area.isWindowOpen() ? ("cuenta regresiva activa, " + area.getJoiners().size() + " unido(s)")
