@@ -47,19 +47,10 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
                 return handleList(sender);
             case "info":
                 return handleInfo(sender, args);
-            case "reload":
-                return handleReload(sender);
             default:
                 sendUsage(sender);
                 return true;
         }
-    }
-
-    private boolean handleReload(CommandSender sender) {
-        areaManager.reload();
-        sender.sendMessage(ChatColor.GREEN + "areas.yml recargado desde disco. Áreas cargadas: "
-                + areaManager.getAreas().size());
-        return true;
     }
 
     private void sendUsage(CommandSender sender) {
@@ -71,7 +62,6 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.RED + "/dungeonarea remove <nombre>");
         sender.sendMessage(ChatColor.RED + "/dungeonarea list");
         sender.sendMessage(ChatColor.RED + "/dungeonarea info <nombre>");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea reload");
     }
 
     private boolean handleWand(CommandSender sender) {
@@ -187,7 +177,7 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(Arrays.asList("wand", "create", "addenter", "addleave", "remove", "list", "info", "reload"), args[0]);
+            return filter(Arrays.asList("wand", "create", "addenter", "addleave", "remove", "list", "info"), args[0]);
         }
         if (args.length == 2 && !args[0].equalsIgnoreCase("wand") && !args[0].equalsIgnoreCase("create")
                 && !args[0].equalsIgnoreCase("list")) {

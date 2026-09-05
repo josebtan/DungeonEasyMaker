@@ -43,6 +43,11 @@ public class DEMPlugin extends JavaPlugin {
         getCommand("dungeonloot").setExecutor(lootCommand);
         getCommand("dungeonloot").setTabCompleter(lootCommand);
 
+        // --- Comando general del plugin (reload, etc.) ---
+        DEMCommand demCommand = new DEMCommand(areaManager, lootManager);
+        getCommand("dem").setExecutor(demCommand);
+        getCommand("dem").setTabCompleter(demCommand);
+
         getLogger().info("DungeonEasyMaker habilitado. Áreas: " + areaManager.getAreas().size()
                 + " | Tablas de loot: " + lootManager.getTables().size());
     }

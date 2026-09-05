@@ -5,6 +5,13 @@ api-version: 1.20
 author: TuServidor
 
 commands:
+  dem:
+    description: Comando general de Dungeon Easy Maker.
+    usage: |
+      /dem reload
+    permission: dungeoncore.admin
+    permission-message: No tienes permiso para usar este comando.
+
   dungeonarea:
     description: Crea y gestiona áreas de dungeon (entrada/salida ejecuta comandos).
     usage: |
@@ -15,7 +22,6 @@ commands:
       /dungeonarea remove <nombre>
       /dungeonarea list
       /dungeonarea info <nombre>
-      /dungeonarea reload
     permission: dungeoncore.admin
     permission-message: No tienes permiso para usar este comando.
 
@@ -36,7 +42,6 @@ commands:
       /dungeonloot removeentry <tabla> <indice>
       /dungeonloot list <tabla>
       /dungeonloot roll <tabla> <jugador>
-      /dungeonloot reload
     permission: dungeoncore.admin
     permission-message: No tienes permiso para usar este comando.
 

@@ -40,19 +40,10 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                 return handleList(sender, args);
             case "roll":
                 return handleRoll(sender, args);
-            case "reload":
-                return handleReload(sender);
             default:
                 sendUsage(sender);
                 return true;
         }
-    }
-
-    private boolean handleReload(CommandSender sender) {
-        lootManager.reload();
-        sender.sendMessage(ChatColor.GREEN + "loot.yml recargado desde disco. Tablas cargadas: "
-                + lootManager.getTables().size());
-        return true;
     }
 
     private void sendUsage(CommandSender sender) {
@@ -62,7 +53,6 @@ public class LootCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.RED + "/dungeonloot removeentry <tabla> <indice>");
         sender.sendMessage(ChatColor.RED + "/dungeonloot list <tabla>");
         sender.sendMessage(ChatColor.RED + "/dungeonloot roll <tabla> <jugador>");
-        sender.sendMessage(ChatColor.RED + "/dungeonloot reload");
     }
 
     private boolean handleCreate(CommandSender sender, String[] args) {
@@ -176,7 +166,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(Arrays.asList("create", "addentry", "removeentry", "list", "roll", "reload"), args[0]);
+            return filter(Arrays.asList("create", "addentry", "removeentry", "list", "roll"), args[0]);
         }
         if (args.length == 2 && !args[0].equalsIgnoreCase("create")) {
             return filter(new ArrayList<>(lootManager.getTables().keySet()), args[1]);

@@ -32,8 +32,8 @@ Ver `src/main/resources/plugin.yml` para el detalle de cada comando.
 `plugins/DungeonEasyMaker/areas.yml` y `plugins/DungeonEasyMaker/loot.yml` son
 archivos de texto plano — puedes editarlos directamente en vez de (o además de)
 usar los comandos en el juego. Después de guardar tus cambios, corre
-`/dungeonarea reload` o `/dungeonloot reload` para que el plugin los relea sin
-tener que reiniciar el servidor.
+`/dem reload` para que el plugin relea ambos archivos sin tener que reiniciar
+el servidor.
 
 ### Formato de `areas.yml`
 
