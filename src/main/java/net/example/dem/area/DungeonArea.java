@@ -2,9 +2,13 @@ package net.example.dem.area;
 
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 public class DungeonArea {
 
@@ -14,6 +18,20 @@ public class DungeonArea {
     private final int maxX, maxY, maxZ;
     private final List<String> enterCommands = new ArrayList<>();
     private final List<String> leaveCommands = new ArrayList<>();
+
+    // --- Ventana de ingreso (cuenta regresiva por cantidad de jugadores) ---
+    // 0 = desactivada: los enterCommands corren normal, uno a uno, como siempre.
+    private int joinWindowSeconds = 0;
+    // Comandos que se ejecutan una vez por cada jugador que entró durante la
+    // ventana, al cerrarse (así "se multiplican" según cuántos entraron).
+    private final List<String> startCommands = new ArrayList<>();
+
+    // Estado en vivo de la ventana. No se persiste en areas.yml: siempre
+    // arranca "libre" cuando el plugin recarga o reinicia.
+    private transient boolean windowOpen = false;
+    private transient boolean locked = false;
+    private final transient Set<UUID> joiners = new HashSet<>();
+    private transient BukkitTask countdownTask;
 
     public DungeonArea(String name, String world, int x1, int y1, int z1, int x2, int y2, int z2) {
         this.name = name;
@@ -60,5 +78,56 @@ public class DungeonArea {
 
     public List<String> getLeaveCommands() {
         return leaveCommands;
+    }
+
+    public int getJoinWindowSeconds() {
+        return joinWindowSeconds;
+    }
+
+    public void setJoinWindowSeconds(int joinWindowSeconds) {
+        this.joinWindowSeconds = Math.max(0, joinWindowSeconds);
+    }
+
+    public List<String> getStartCommands() {
+        return startCommands;
+    }
+
+    public boolean isWindowOpen() {
+        return windowOpen;
+    }
+
+    public void setWindowOpen(boolean windowOpen) {
+        this.windowOpen = windowOpen;
+    }
+
+    public boolean isLocked() {
+        return locked;
+    }
+
+    public void setLocked(boolean locked) {
+        this.locked = locked;
+    }
+
+    public Set<UUID> getJoiners() {
+        return joiners;
+    }
+
+    public void setCountdownTask(BukkitTask task) {
+        this.countdownTask = task;
+    }
+
+    /**
+     * Vuelve el área a su estado "libre": sin ventana abierta, sin bloqueo,
+     * sin jugadores registrados. Se usa cuando termina un intento (o cuando
+     * todos salen antes de que arranque) para que se pueda usar de nuevo.
+     */
+    public void resetWindowState() {
+        windowOpen = false;
+        locked = false;
+        joiners.clear();
+        if (countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
+        }
     }
 }

@@ -49,6 +49,12 @@ public class AreaModule {
                 return handleAddCommandHere(sender, args, true);
             case "addleavehere":
                 return handleAddCommandHere(sender, args, false);
+            case "setwindow":
+                return handleSetWindow(sender, args);
+            case "addstart":
+                return handleAddStart(sender, args);
+            case "addstarthere":
+                return handleAddStartHere(sender, args);
             case "remove":
                 return handleRemove(sender, args);
             case "list":
@@ -77,6 +83,9 @@ public class AreaModule {
         sender.sendMessage(ChatColor.RED + "/dem area addleave <nombre> <comando>");
         sender.sendMessage(ChatColor.RED + "/dem area addenterhere <comando>  (usa el área seleccionada o donde estás parado)");
         sender.sendMessage(ChatColor.RED + "/dem area addleavehere <comando>");
+        sender.sendMessage(ChatColor.RED + "/dem area setwindow <nombre> <segundos>  (0 = desactivar)");
+        sender.sendMessage(ChatColor.RED + "/dem area addstart <nombre> <comando>  (corre 1 vez por jugador al cerrar la ventana)");
+        sender.sendMessage(ChatColor.RED + "/dem area addstarthere <comando>");
         sender.sendMessage(ChatColor.RED + "/dem area select <nombre>");
         sender.sendMessage(ChatColor.RED + "/dem area unselect");
         sender.sendMessage(ChatColor.RED + "/dem area here");
@@ -86,6 +95,9 @@ public class AreaModule {
         sender.sendMessage(ChatColor.RED + "/dem area info <nombre>");
         sender.sendMessage(ChatColor.GRAY + "Placeholders disponibles en los comandos: [player] [world] [x] [y] [z] (+ PlaceholderAPI si está instalado)");
         sender.sendMessage(ChatColor.GRAY + "Delay opcional: \"delay:<segundos>|<comando>\"");
+        sender.sendMessage(ChatColor.GRAY + "Ventana de ingreso: al entrar el 1er jugador arranca la cuenta regresiva "
+                + "(setwindow); al cerrarse, addstart corre 1 vez por cada jugador dentro (multiplica spawns) "
+                + "y el área se bloquea hasta que quede vacía.");
     }
 
     private boolean handleWand(CommandSender sender) {
@@ -176,6 +188,79 @@ public class AreaModule {
         areaManager.save();
         sender.sendMessage(ChatColor.GREEN + "Comando agregado a '" + area.getName() + "' ("
                 + (isEnter ? "entrada" : "salida") + "): " + commandText);
+    }
+
+    private boolean handleSetWindow(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area setwindow <nombre> <segundos>");
+            return true;
+        }
+        DungeonArea area = areaManager.getArea(args[1]);
+        if (area == null) {
+            sender.sendMessage(ChatColor.RED + "No existe el área '" + args[1] + "'.");
+            return true;
+        }
+        int seconds;
+        try {
+            seconds = Integer.parseInt(args[2]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(ChatColor.RED + "El tiempo debe ser un número entero de segundos.");
+            return true;
+        }
+        area.setJoinWindowSeconds(seconds);
+        areaManager.save();
+        if (area.getJoinWindowSeconds() == 0) {
+            sender.sendMessage(ChatColor.GREEN + "Ventana de ingreso desactivada en '" + area.getName()
+                    + "'. Los comandos de entrada vuelven a correr normal, uno por jugador.");
+        } else {
+            sender.sendMessage(ChatColor.GREEN + "Ventana de ingreso de '" + area.getName() + "' establecida en "
+                    + area.getJoinWindowSeconds() + " segundos. Al entrar el primer jugador arranca la cuenta "
+                    + "regresiva; al terminar, se bloquea la entrada y los comandos de 'addstart' corren una "
+                    + "vez por cada jugador que se haya unido.");
+        }
+        return true;
+    }
+
+    private boolean handleAddStart(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area addstart <nombre> <comando>");
+            return true;
+        }
+        DungeonArea area = areaManager.getArea(args[1]);
+        if (area == null) {
+            sender.sendMessage(ChatColor.RED + "No existe el área '" + args[1] + "'.");
+            return true;
+        }
+        String commandText = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+        addStartCommandToArea(sender, area, commandText);
+        return true;
+    }
+
+    // /dem area addstarthere <comando...> — igual que addenterhere pero para la
+    // lista de comandos "de arranque" (los que se multiplican por jugador).
+    private boolean handleAddStartHere(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area addstarthere <comando>");
+            return true;
+        }
+        DungeonArea area = resolveArea(sender);
+        if (area == null) {
+            return true; // el mensaje de error ya lo mandó resolveArea()
+        }
+        String commandText = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+        addStartCommandToArea(sender, area, commandText);
+        return true;
+    }
+
+    private void addStartCommandToArea(CommandSender sender, DungeonArea area, String commandText) {
+        area.getStartCommands().add(commandText);
+        areaManager.save();
+        String windowNote = area.getJoinWindowSeconds() == 0
+                ? " (ADVERTENCIA: esta área todavía no tiene ventana de ingreso configurada con /dem area setwindow, "
+                    + "así que este comando nunca se va a ejecutar)"
+                : "";
+        sender.sendMessage(ChatColor.GREEN + "Comando de arranque agregado a '" + area.getName()
+                + "' (corre una vez por jugador al cerrar la ventana): " + commandText + windowNote);
     }
 
     /**
@@ -333,16 +418,30 @@ public class AreaModule {
         area.getEnterCommands().forEach(c -> sender.sendMessage(ChatColor.GRAY + " - " + c));
         sender.sendMessage(ChatColor.AQUA + "Comandos de salida:");
         area.getLeaveCommands().forEach(c -> sender.sendMessage(ChatColor.GRAY + " - " + c));
+
+        if (area.getJoinWindowSeconds() > 0) {
+            sender.sendMessage(ChatColor.AQUA + "Ventana de ingreso: " + area.getJoinWindowSeconds() + "s");
+            sender.sendMessage(ChatColor.AQUA + "Comandos de arranque (x jugador):");
+            area.getStartCommands().forEach(c -> sender.sendMessage(ChatColor.GRAY + " - " + c));
+            String estado = area.isLocked() ? ("bloqueada, " + area.getJoiners().size() + " jugador(es) dentro")
+                    : area.isWindowOpen() ? ("cuenta regresiva activa, " + area.getJoiners().size() + " unido(s)")
+                    : "libre";
+            sender.sendMessage(ChatColor.AQUA + "Estado actual: " + estado);
+        } else {
+            sender.sendMessage(ChatColor.AQUA + "Ventana de ingreso: desactivada");
+        }
         return true;
     }
 
     public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length == 1) {
             return filter(Arrays.asList("wand", "create", "addenter", "addleave", "addenterhere",
-                    "addleavehere", "select", "unselect", "here", "show", "remove", "list", "info"), args[0]);
+                    "addleavehere", "setwindow", "addstart", "addstarthere",
+                    "select", "unselect", "here", "show", "remove", "list", "info"), args[0]);
         }
         boolean needsAreaName = args.length == 2 && Arrays.asList(
-                "addenter", "addleave", "remove", "info", "select", "show").contains(args[0].toLowerCase());
+                "addenter", "addleave", "addstart", "setwindow", "remove", "info", "select", "show")
+                .contains(args[0].toLowerCase());
         if (needsAreaName) {
             return filter(new ArrayList<>(areaManager.getAreas().keySet()), args[1]);
         }

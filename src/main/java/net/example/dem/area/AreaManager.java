@@ -45,6 +45,8 @@ public class AreaManager {
             );
             area.getEnterCommands().addAll(s.getStringList("enter-commands"));
             area.getLeaveCommands().addAll(s.getStringList("leave-commands"));
+            area.setJoinWindowSeconds(s.getInt("join-window-seconds", 0));
+            area.getStartCommands().addAll(s.getStringList("start-commands"));
             areas.put(name.toLowerCase(), area);
         }
     }
@@ -76,6 +78,8 @@ public class AreaManager {
             config.set(base + ".maxZ", area.getMaxZ());
             config.set(base + ".enter-commands", area.getEnterCommands());
             config.set(base + ".leave-commands", area.getLeaveCommands());
+            config.set(base + ".join-window-seconds", area.getJoinWindowSeconds());
+            config.set(base + ".start-commands", area.getStartCommands());
         }
 
         try {

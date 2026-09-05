@@ -17,6 +17,38 @@ Todo el plugin se maneja desde un único comando raíz: **`/dem`**.
 - **`/dem reload`**: recarga `areas.yml` y `loot.yml` desde disco sin
   reiniciar el servidor.
 
+## Ventana de ingreso (dificultad según cantidad de jugadores)
+
+Cada área puede tener una "ventana de ingreso" opcional:
+
+1. Entra el primer jugador → arranca una cuenta regresiva (`setwindow`).
+2. Mientras corre la cuenta, otros jugadores pueden sumarse entrando al área.
+3. Al terminar el tiempo, el área se **bloquea**: nadie más puede entrar hasta
+   que quede vacía de nuevo.
+4. Los comandos de `addstart` se ejecutan **una vez por cada jugador** que
+   entró durante la ventana. Si el comando spawnea mobs, eso multiplica la
+   cantidad de enemigos según cuántos jugadores se unieron.
+
+```
+/dem area setwindow nivel1 15
+/dem area addstarthere cmi spawnmob zombie;hp{20} 3 [player]
+```
+
+Con el ejemplo de arriba: si entran 2 jugadores durante los 15 segundos, el
+comando corre 2 veces (una por jugador), spawneando 3 zombis para cada uno
+(6 en total). `[player]` se resuelve distinto en cada ejecución.
+
+- `setwindow <nombre> 0` desactiva la ventana; el área vuelve a comportarse
+  como antes (los `enter-commands` corren normal, uno por jugador, al momento
+  de entrar).
+- Los `enter-commands`/`leave-commands` siguen funcionando igual con la
+  ventana activada (útiles para mensajes de bienvenida, por ejemplo); son los
+  `addstart` los que se disparan al cerrarse la cuenta regresiva.
+- Si todos los jugadores salen del área antes de que termine la cuenta,
+  simplemente no arranca nada y el área queda libre otra vez.
+- Si todos salen después de que ya arrancó (área bloqueada), se libera
+  automáticamente para un nuevo intento.
+
 ## Placeholders y delays en los comandos
 
 Todos los comandos que definas (en áreas, objetivos y loot) soportan:
@@ -55,6 +87,8 @@ El `.jar` se genera en `target/DungeonEasyMaker.jar`.
 /dem area create <nombre>
 /dem area addenter <nombre> <comando>
 /dem area addleave <nombre> <comando>
+/dem area setwindow <nombre> <segundos>
+/dem area addstart <nombre> <comando>
 /dem area remove <nombre>
 /dem area list
 /dem area info <nombre>
@@ -97,6 +131,9 @@ areas:
       - "execute as @e[type=zombie,distance=..10,limit=3,sort=nearest] run tag @s add nivel1_[player]"
       - "dem objective watch nivel1_[player] 3 broadcast &6¡El jefe despierta!~~delay:2|cmi spawnmob zombie;hp{80};n{{#8b00ff}Mini-Jefe};s{2} 1 [player]"
     leave-commands: []
+    join-window-seconds: 15
+    start-commands:
+      - "cmi spawnmob zombie;hp{20};n{{#c00000}Guardián} 3 [player] sp:4"
 ```
 
 - `minX/minY/minZ` y `maxX/maxY/maxZ` son las dos esquinas del cuboide (caja 3D)
@@ -104,6 +141,9 @@ areas:
   cubrir una sala completa marca una esquina en el piso y la opuesta en el techo.
 - Varios comandos en el `on-complete` de `dem objective watch` se separan con
   `~~` (no con salto de línea), porque van todos en una sola línea de comando.
+- `join-window-seconds` (0 = desactivado) y `start-commands` son la ventana de
+  ingreso: `start-commands` corre una vez por cada jugador que entró durante
+  esos segundos, apenas se cierra la cuenta regresiva.
 
 ### Formato de `loot.yml`
 
