@@ -1,32 +1,29 @@
 package net.example.dem.area;
 
-import net.example.dem.DEMPlugin;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class AreaCommand implements CommandExecutor, TabCompleter {
+/**
+ * Lógica del módulo de áreas. Se invoca desde /dem area <accion> ...
+ * args[] aquí NO incluye "area", empieza directo en la acción (wand, create, etc).
+ */
+public class AreaModule {
 
-    private final DEMPlugin plugin;
     private final AreaManager areaManager;
     private final SelectionListener selectionListener;
 
-    public AreaCommand(DEMPlugin plugin, AreaManager areaManager, SelectionListener selectionListener) {
-        this.plugin = plugin;
+    public AreaModule(AreaManager areaManager, SelectionListener selectionListener) {
         this.areaManager = areaManager;
         this.selectionListener = selectionListener;
     }
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean handle(CommandSender sender, String[] args) {
         if (args.length == 0) {
             sendUsage(sender);
             return true;
@@ -55,13 +52,15 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(ChatColor.RED + "Uso:");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea wand");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea create <nombre>");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea addenter <nombre> <comando>");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea addleave <nombre> <comando>");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea remove <nombre>");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea list");
-        sender.sendMessage(ChatColor.RED + "/dungeonarea info <nombre>");
+        sender.sendMessage(ChatColor.RED + "/dem area wand");
+        sender.sendMessage(ChatColor.RED + "/dem area create <nombre>");
+        sender.sendMessage(ChatColor.RED + "/dem area addenter <nombre> <comando>");
+        sender.sendMessage(ChatColor.RED + "/dem area addleave <nombre> <comando>");
+        sender.sendMessage(ChatColor.RED + "/dem area remove <nombre>");
+        sender.sendMessage(ChatColor.RED + "/dem area list");
+        sender.sendMessage(ChatColor.RED + "/dem area info <nombre>");
+        sender.sendMessage(ChatColor.GRAY + "Placeholders disponibles en los comandos: [player] [world] [x] [y] [z]");
+        sender.sendMessage(ChatColor.GRAY + "Delay opcional: \"delay:<segundos>|<comando>\"");
     }
 
     private boolean handleWand(CommandSender sender) {
@@ -81,7 +80,7 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dungeonarea create <nombre>");
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area create <nombre>");
             return true;
         }
 
@@ -91,7 +90,7 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
 
         if (pos1 == null || pos2 == null) {
             sender.sendMessage(ChatColor.RED + "Primero selecciona las dos esquinas con la varita "
-                    + "(/dungeonarea wand).");
+                    + "(/dem area wand).");
             return true;
         }
         if (pos1.getWorld() == null || !pos1.getWorld().equals(pos2.getWorld())) {
@@ -106,13 +105,13 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
         );
         areaManager.addArea(area);
         sender.sendMessage(ChatColor.GREEN + "Área '" + name + "' creada. Ahora agrégale comandos con "
-                + "/dungeonarea addenter " + name + " <comando>");
+                + "/dem area addenter " + name + " <comando>");
         return true;
     }
 
     private boolean handleAddCommand(CommandSender sender, String[] args, boolean isEnter) {
         if (args.length < 3) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dungeonarea " + args[0] + " <nombre> <comando>");
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area " + args[0] + " <nombre> <comando>");
             return true;
         }
         DungeonArea area = areaManager.getArea(args[1]);
@@ -134,7 +133,7 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
 
     private boolean handleRemove(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dungeonarea remove <nombre>");
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area remove <nombre>");
             return true;
         }
         if (areaManager.removeArea(args[1])) {
@@ -156,7 +155,7 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
 
     private boolean handleInfo(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dungeonarea info <nombre>");
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area info <nombre>");
             return true;
         }
         DungeonArea area = areaManager.getArea(args[1]);
@@ -174,8 +173,7 @@ public class AreaCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+    public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length == 1) {
             return filter(Arrays.asList("wand", "create", "addenter", "addleave", "remove", "list", "info"), args[0]);
         }

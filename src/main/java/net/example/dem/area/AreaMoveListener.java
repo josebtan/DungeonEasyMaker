@@ -1,13 +1,16 @@
 package net.example.dem.area;
 
-import org.bukkit.Bukkit;
+import net.example.dem.util.CommandRunner;
+import net.example.dem.util.PlaceholderContext;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.plugin.Plugin;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,11 +20,13 @@ import java.util.Set;
  */
 public class AreaMoveListener implements org.bukkit.event.Listener {
 
+    private final Plugin plugin;
     private final AreaManager areaManager;
     // playerUUID -> set de nombres de áreas en las que está actualmente
     private final Map<java.util.UUID, Set<String>> playersInside = new HashMap<>();
 
-    public AreaMoveListener(AreaManager areaManager) {
+    public AreaMoveListener(Plugin plugin, AreaManager areaManager) {
+        this.plugin = plugin;
         this.areaManager = areaManager;
     }
 
@@ -47,19 +52,18 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
 
             if (isInsideNow && !wasInsideBefore) {
                 currentlyInside.add(area.getName());
-                runCommands(area.getEnterCommands(), player);
+                runCommands(area.getEnterCommands(), player, to);
             } else if (!isInsideNow && wasInsideBefore) {
                 currentlyInside.remove(area.getName());
-                runCommands(area.getLeaveCommands(), player);
+                runCommands(area.getLeaveCommands(), player, to);
             }
         }
     }
 
-    private void runCommands(java.util.List<String> commands, Player player) {
-        for (String raw : commands) {
-            String command = raw.replace("[player]", player.getName())
-                                 .replace("[playerName]", player.getName());
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-        }
+    private void runCommands(List<String> commands, Player player, Location loc) {
+        PlaceholderContext context = new PlaceholderContext(
+                player.getName(), loc.getWorld().getName(),
+                loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        CommandRunner.runAll(plugin, commands, context);
     }
 }

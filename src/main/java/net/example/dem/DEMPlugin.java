@@ -1,14 +1,14 @@
 package net.example.dem;
 
-import net.example.dem.area.AreaCommand;
 import net.example.dem.area.AreaManager;
+import net.example.dem.area.AreaModule;
 import net.example.dem.area.AreaMoveListener;
 import net.example.dem.area.SelectionListener;
-import net.example.dem.loot.LootCommand;
 import net.example.dem.loot.LootManager;
+import net.example.dem.loot.LootModule;
 import net.example.dem.objective.GuardDeathListener;
-import net.example.dem.objective.ObjectiveCommand;
 import net.example.dem.objective.ObjectiveManager;
+import net.example.dem.objective.ObjectiveModule;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class DEMPlugin extends JavaPlugin {
@@ -24,27 +24,21 @@ public class DEMPlugin extends JavaPlugin {
         areaManager.load();
         SelectionListener selectionListener = new SelectionListener();
         getServer().getPluginManager().registerEvents(selectionListener, this);
-        getServer().getPluginManager().registerEvents(new AreaMoveListener(areaManager), this);
-        AreaCommand areaCommand = new AreaCommand(this, areaManager, selectionListener);
-        getCommand("dungeonarea").setExecutor(areaCommand);
-        getCommand("dungeonarea").setTabCompleter(areaCommand);
+        getServer().getPluginManager().registerEvents(new AreaMoveListener(this, areaManager), this);
+        AreaModule areaModule = new AreaModule(areaManager, selectionListener);
 
         // --- Módulo de Objetivos ---
         objectiveManager = new ObjectiveManager();
         getServer().getPluginManager().registerEvents(new GuardDeathListener(this, objectiveManager), this);
-        ObjectiveCommand objectiveCommand = new ObjectiveCommand(objectiveManager);
-        getCommand("dungeon").setExecutor(objectiveCommand);
-        getCommand("dungeon").setTabCompleter(objectiveCommand);
+        ObjectiveModule objectiveModule = new ObjectiveModule(objectiveManager);
 
         // --- Módulo de Loot ---
         lootManager = new LootManager(this);
         lootManager.load();
-        LootCommand lootCommand = new LootCommand(this, lootManager);
-        getCommand("dungeonloot").setExecutor(lootCommand);
-        getCommand("dungeonloot").setTabCompleter(lootCommand);
+        LootModule lootModule = new LootModule(this, lootManager);
 
-        // --- Comando general del plugin (reload, etc.) ---
-        DEMCommand demCommand = new DEMCommand(areaManager, lootManager);
+        // --- Comando único: /dem area|objective|loot|reload ---
+        DEMCommand demCommand = new DEMCommand(areaManager, lootManager, areaModule, objectiveModule, lootModule);
         getCommand("dem").setExecutor(demCommand);
         getCommand("dem").setTabCompleter(demCommand);
 

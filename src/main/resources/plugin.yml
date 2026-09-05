@@ -6,46 +6,16 @@ author: TuServidor
 
 commands:
   dem:
-    description: Comando general de Dungeon Easy Maker.
+    description: Dungeon Easy Maker - crea áreas, objetivos y loot para tus dungeons.
     usage: |
+      /dem area <wand|create|addenter|addleave|remove|list|info>
+      /dem objective <watch|reset|status>
+      /dem loot <create|addentry|removeentry|list|roll>
       /dem reload
-    permission: dungeoncore.admin
-    permission-message: No tienes permiso para usar este comando.
-
-  dungeonarea:
-    description: Crea y gestiona áreas de dungeon (entrada/salida ejecuta comandos).
-    usage: |
-      /dungeonarea wand
-      /dungeonarea create <nombre>
-      /dungeonarea addenter <nombre> <comando>
-      /dungeonarea addleave <nombre> <comando>
-      /dungeonarea remove <nombre>
-      /dungeonarea list
-      /dungeonarea info <nombre>
-    permission: dungeoncore.admin
-    permission-message: No tienes permiso para usar este comando.
-
-  dungeon:
-    description: Gestiona objetivos (grupos de mobs a rastrear).
-    usage: |
-      /dungeon watch <tag> <cantidad> <comando1>~~<comando2>~~...
-      /dungeon reset <tag>
-      /dungeon status <tag>
-    permission: dungeoncore.admin
-    permission-message: No tienes permiso para usar este comando.
-
-  dungeonloot:
-    description: Gestiona tablas de loot con pesos/probabilidades.
-    usage: |
-      /dungeonloot create <tabla>
-      /dungeonloot addentry <tabla> <peso> <comando>
-      /dungeonloot removeentry <tabla> <indice>
-      /dungeonloot list <tabla>
-      /dungeonloot roll <tabla> <jugador>
     permission: dungeoncore.admin
     permission-message: No tienes permiso para usar este comando.
 
 permissions:
   dungeoncore.admin:
-    description: Permite administrar DungeonEasyMaker
+    description: Permite administrar Dungeon Easy Maker
     default: op

@@ -1,8 +1,7 @@
 package net.example.dem.objective;
 
 import net.example.dem.DEMPlugin;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
+import net.example.dem.util.CommandRunner;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -35,27 +34,13 @@ public class GuardDeathListener implements Listener {
             plugin.getLogger().info("Objetivo con tag '" + tag + "' actualizado. Quedan: " + remaining);
 
             if (remaining <= 0) {
-                runOnComplete(state);
+                // Los comandos ya vienen con los placeholders resueltos desde que se
+                // creó el objetivo (via /dem objective watch), así que no hace falta
+                // un PlaceholderContext aquí. Igual soporta "delay:<segundos>|comando".
+                CommandRunner.runAll(plugin, state.getOnCompleteCommands(), null);
                 activeGroups.remove(tag);
             }
             break;
-        }
-    }
-
-    private void runOnComplete(GroupState state) {
-        for (String command : state.getOnCompleteCommands()) {
-            String trimmed = command.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (trimmed.startsWith("broadcast ")) {
-                    String message = trimmed.substring("broadcast ".length());
-                    Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', message));
-                } else {
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), trimmed);
-                }
-            });
         }
     }
 }

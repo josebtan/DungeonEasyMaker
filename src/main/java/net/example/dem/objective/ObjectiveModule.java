@@ -1,25 +1,24 @@
 package net.example.dem.objective;
 
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class ObjectiveCommand implements CommandExecutor, TabCompleter {
+/**
+ * Lógica del módulo de objetivos. Se invoca desde /dem objective <accion> ...
+ */
+public class ObjectiveModule {
 
     private final ObjectiveManager objectiveManager;
 
-    public ObjectiveCommand(ObjectiveManager objectiveManager) {
+    public ObjectiveModule(ObjectiveManager objectiveManager) {
         this.objectiveManager = objectiveManager;
     }
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean handle(CommandSender sender, String[] args) {
         if (args.length == 0) {
             sendUsage(sender);
             return true;
@@ -40,14 +39,16 @@ public class ObjectiveCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(ChatColor.RED + "Uso:");
-        sender.sendMessage(ChatColor.RED + "/dungeon watch <tag> <cantidad> <comando1>~~<comando2>~~...");
-        sender.sendMessage(ChatColor.RED + "/dungeon reset <tag>");
-        sender.sendMessage(ChatColor.RED + "/dungeon status <tag>");
+        sender.sendMessage(ChatColor.RED + "/dem objective watch <tag> <cantidad> <comando1>~~<comando2>~~...");
+        sender.sendMessage(ChatColor.RED + "/dem objective reset <tag>");
+        sender.sendMessage(ChatColor.RED + "/dem objective status <tag>");
+        sender.sendMessage(ChatColor.GRAY + "Delay opcional por comando: \"delay:<segundos>|<comando>\"");
     }
 
+    // /dem objective watch <tag> <cantidad> <comando1>~~<comando2>~~<comando3>...
     private boolean handleWatch(CommandSender sender, String[] args) {
         if (args.length < 4) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dungeon watch <tag> <cantidad> <comando1>~~<comando2>~~...");
+            sender.sendMessage(ChatColor.RED + "Uso: /dem objective watch <tag> <cantidad> <comando1>~~<comando2>~~...");
             return true;
         }
 
@@ -71,7 +72,7 @@ public class ObjectiveCommand implements CommandExecutor, TabCompleter {
 
     private boolean handleReset(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dungeon reset <tag>");
+            sender.sendMessage(ChatColor.RED + "Uso: /dem objective reset <tag>");
             return true;
         }
         String tag = args[1];
@@ -85,7 +86,7 @@ public class ObjectiveCommand implements CommandExecutor, TabCompleter {
 
     private boolean handleStatus(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dungeon status <tag>");
+            sender.sendMessage(ChatColor.RED + "Uso: /dem objective status <tag>");
             return true;
         }
         String tag = args[1];
@@ -99,8 +100,7 @@ public class ObjectiveCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+    public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length == 1) {
             return filter(Arrays.asList("watch", "reset", "status"), args[0]);
         }
