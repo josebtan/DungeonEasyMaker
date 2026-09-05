@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compilar con Maven
+        run: mvn -B package --file pom.xml
+
+      - name: Subir el .jar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: DungeonEasyMaker
+          path: target/DungeonEasyMaker.jar

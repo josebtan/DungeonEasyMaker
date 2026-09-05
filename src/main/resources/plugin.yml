@@ -1,0 +1,44 @@
+name: DungeonEasyMaker
+version: 1.0.0
+main: net.example.dem.DEMPlugin
+api-version: 1.20
+author: TuServidor
+
+commands:
+  dungeonarea:
+    description: Crea y gestiona áreas de dungeon (entrada/salida ejecuta comandos).
+    usage: |
+      /dungeonarea wand
+      /dungeonarea create <nombre>
+      /dungeonarea addenter <nombre> <comando>
+      /dungeonarea addleave <nombre> <comando>
+      /dungeonarea remove <nombre>
+      /dungeonarea list
+      /dungeonarea info <nombre>
+    permission: dungeoncore.admin
+    permission-message: No tienes permiso para usar este comando.
+
+  dungeon:
+    description: Gestiona objetivos (grupos de mobs a rastrear).
+    usage: |
+      /dungeon watch <tag> <cantidad> <comando1>~~<comando2>~~...
+      /dungeon reset <tag>
+      /dungeon status <tag>
+    permission: dungeoncore.admin
+    permission-message: No tienes permiso para usar este comando.
+
+  dungeonloot:
+    description: Gestiona tablas de loot con pesos/probabilidades.
+    usage: |
+      /dungeonloot create <tabla>
+      /dungeonloot addentry <tabla> <peso> <comando>
+      /dungeonloot removeentry <tabla> <indice>
+      /dungeonloot list <tabla>
+      /dungeonloot roll <tabla> <jugador>
+    permission: dungeoncore.admin
+    permission-message: No tienes permiso para usar este comando.
+
+permissions:
+  dungeoncore.admin:
+    description: Permite administrar DungeonEasyMaker
+    default: op
