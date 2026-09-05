@@ -4,6 +4,8 @@ import net.example.dem.area.AreaManager;
 import net.example.dem.area.AreaModule;
 import net.example.dem.area.AreaMoveListener;
 import net.example.dem.area.SelectionListener;
+import net.example.dem.gui.GuiListener;
+import net.example.dem.gui.GuiManager;
 import net.example.dem.loot.LootManager;
 import net.example.dem.loot.LootModule;
 import net.example.dem.objective.GuardDeathListener;
@@ -37,8 +39,12 @@ public class DEMPlugin extends JavaPlugin {
         lootManager.load();
         LootModule lootModule = new LootModule(this, lootManager);
 
-        // --- Comando único: /dem area|objective|loot|reload ---
-        DEMCommand demCommand = new DEMCommand(areaManager, lootManager, areaModule, objectiveModule, lootModule);
+        // --- GUI de configuración (inventario) ---
+        GuiManager guiManager = new GuiManager(this, areaManager, selectionListener);
+        getServer().getPluginManager().registerEvents(new GuiListener(guiManager), this);
+
+        // --- Comando único: /dem area|objective|loot|gui|reload ---
+        DEMCommand demCommand = new DEMCommand(areaManager, lootManager, areaModule, objectiveModule, lootModule, guiManager);
         getCommand("dem").setExecutor(demCommand);
         getCommand("dem").setTabCompleter(demCommand);
 

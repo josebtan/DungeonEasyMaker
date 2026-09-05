@@ -2,6 +2,7 @@ package net.example.dem;
 
 import net.example.dem.area.AreaManager;
 import net.example.dem.area.AreaModule;
+import net.example.dem.gui.GuiManager;
 import net.example.dem.loot.LootManager;
 import net.example.dem.loot.LootModule;
 import net.example.dem.objective.ObjectiveModule;
@@ -10,6 +11,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,6 +22,7 @@ import java.util.List;
  *   /dem area ...
  *   /dem objective ...
  *   /dem loot ...
+ *   /dem gui
  *   /dem reload
  */
 public class DEMCommand implements CommandExecutor, TabCompleter {
@@ -29,14 +32,17 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
     private final AreaModule areaModule;
     private final ObjectiveModule objectiveModule;
     private final LootModule lootModule;
+    private final GuiManager guiManager;
 
     public DEMCommand(AreaManager areaManager, LootManager lootManager,
-                       AreaModule areaModule, ObjectiveModule objectiveModule, LootModule lootModule) {
+                       AreaModule areaModule, ObjectiveModule objectiveModule, LootModule lootModule,
+                       GuiManager guiManager) {
         this.areaManager = areaManager;
         this.lootManager = lootManager;
         this.areaModule = areaModule;
         this.objectiveModule = objectiveModule;
         this.lootModule = lootModule;
+        this.guiManager = guiManager;
     }
 
     @Override
@@ -55,6 +61,9 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
                 return objectiveModule.handle(sender, rest);
             case "loot":
                 return lootModule.handle(sender, rest);
+            case "gui":
+            case "menu":
+                return handleGui(sender);
             case "reload":
                 return handleReload(sender);
             default:
@@ -63,11 +72,21 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private boolean handleGui(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.RED + "Solo un jugador puede abrir el menú.");
+            return true;
+        }
+        guiManager.openMainMenu(player);
+        return true;
+    }
+
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(ChatColor.RED + "Uso:");
         sender.sendMessage(ChatColor.RED + "/dem area <wand|create|addenter|addleave|remove|list|info>");
         sender.sendMessage(ChatColor.RED + "/dem objective <watch|reset|status>");
         sender.sendMessage(ChatColor.RED + "/dem loot <create|addentry|removeentry|list|roll>");
+        sender.sendMessage(ChatColor.RED + "/dem gui  (menú de configuración por inventario)");
         sender.sendMessage(ChatColor.RED + "/dem reload");
     }
 
@@ -82,7 +101,7 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(Arrays.asList("area", "objective", "loot", "reload"), args[0]);
+            return filter(Arrays.asList("area", "objective", "loot", "gui", "reload"), args[0]);
         }
 
         String[] rest = Arrays.copyOfRange(args, 1, args.length);

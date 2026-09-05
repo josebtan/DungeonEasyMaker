@@ -49,6 +49,33 @@ comando corre 2 veces (una por jugador), spawneando 3 zombis para cada uno
 - Si todos salen después de que ya arrancó (área bloqueada), se libera
   automáticamente para un nuevo intento.
 
+## GUI de configuración (inventario)
+
+Para no tener que escribir comandos largos a mano, **`/dem gui`** (alias
+`/dem menu`) abre un menú tipo inventario donde podés hacer casi todo lo del
+módulo de áreas con clicks:
+
+- **Menú principal**: lista de áreas existentes (click para configurar),
+  botón para recibir la varita, botón para crear un área nueva y botón de
+  recargar.
+- **Menú de un área**: ver contorno, seleccionar/deseleccionar, abrir las
+  listas de comandos de entrada/salida/arranque, ajustar la ventana de
+  ingreso (+5s / -5s con click normal, +30s / -30s con shift+click) y
+  eliminar el área (shift+click para confirmar).
+- **Lista de comandos**: cada comando es un item que podés click-earlo para
+  borrarlo; "Agregar comando" te pide escribirlo en el chat (Minecraft no
+  tiene un campo de texto dentro de un inventario) y lo agrega apenas
+  respondés.
+
+Crear un área desde el GUI sigue necesitando marcar las 2 esquinas en el
+mundo con la varita (eso no se puede hacer desde un inventario), pero ya no
+hace falta escribir `/dem area create <nombre>`: el botón "Crear área nueva"
+te pide el nombre por chat y la crea directo.
+
+Los comandos de texto (`/dem area addenter`, `addstart`, etc.) siguen
+funcionando exactamente igual que antes; el GUI es una capa opcional encima,
+no un reemplazo.
+
 ## Placeholders y delays en los comandos
 
 Todos los comandos que definas (en áreas, objetivos y loot) soportan:
@@ -103,6 +130,7 @@ El `.jar` se genera en `target/DungeonEasyMaker.jar`.
 /dem loot list <tabla>
 /dem loot roll <tabla> <jugador>
 
+/dem gui
 /dem reload
 ```
 
