@@ -94,6 +94,35 @@ public class GuiHolders {
         }
     }
 
+    /** Selector paginado de tipo base (huevos de spawn) al crear un mob nuevo. */
+    public static class MobTypePickerHolder implements InventoryHolder {
+        private final String areaName;
+        private final int page;
+        private Inventory inventory;
+
+        public MobTypePickerHolder(String areaName, int page) {
+            this.areaName = areaName;
+            this.page = page;
+        }
+
+        public String getAreaName() {
+            return areaName;
+        }
+
+        public int getPage() {
+            return page;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
+        }
+    }
+
     public static class MobEditorMenuHolder implements InventoryHolder {
         private final String areaName;
         private final String mobId;

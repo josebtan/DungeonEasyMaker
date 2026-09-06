@@ -74,9 +74,11 @@ Por comando:
 ```
 
 O por GUI: `/dem gui` → elegí el área → botón "Mobs" → "Crear mob nuevo" →
-click en el mob para abrir su editor (vida, escala, velocidad, delay,
-cantidad, posición, efectos, etiqueta, loot, flags) → botón "Equipamiento"
-para un editor tipo muñeco de papel donde arrastrás ítems reales a cada slot.
+elegís el tipo en un selector paginado con huevos de spawn (o cabeza/ícono si
+el tipo no tiene huevo) → le escribís un id por chat → se abre su editor
+(vida, escala, velocidad, delay, cantidad, posición, efectos, etiqueta, loot,
+flags) → botón "Equipamiento" para un editor tipo muñeco de papel donde
+arrastrás ítems reales a cada slot.
 
 Requiere Paper 1.21+ (para la escala real de los mobs vía `Attribute.GENERIC_SCALE`).
 

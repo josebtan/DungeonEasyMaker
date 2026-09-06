@@ -9,6 +9,7 @@ import net.example.dem.gui.GuiHolders.MainMenuHolder;
 import net.example.dem.gui.GuiHolders.MobEditorMenuHolder;
 import net.example.dem.gui.GuiHolders.MobEquipMenuHolder;
 import net.example.dem.gui.GuiHolders.MobListMenuHolder;
+import net.example.dem.gui.GuiHolders.MobTypePickerHolder;
 import net.example.dem.mob.MobSpawnDefinition;
 import net.example.dem.util.AreaVisualizer;
 import org.bukkit.Bukkit;
@@ -62,6 +63,20 @@ public class GuiManager {
         EQUIP_SLOT_POSITIONS.put(16, EquipmentSlot.OFF_HAND);
     }
 
+    // Tipos de entidad elegibles para el selector de "crear mob" (con huevo de
+    // spawn o no): cualquier entidad viva, salvo jugadores, armor stands y
+    // cosas que no tiene sentido spawnear a mano.
+    private static final List<EntityType> SPAWNABLE_TYPES = new ArrayList<>();
+    static {
+        for (EntityType type : EntityType.values()) {
+            if (!type.isAlive()) continue;
+            if (type == EntityType.PLAYER || type == EntityType.ARMOR_STAND || type == EntityType.UNKNOWN) continue;
+            SPAWNABLE_TYPES.add(type);
+        }
+        SPAWNABLE_TYPES.sort((a, b) -> a.name().compareTo(b.name()));
+    }
+    private static final int TYPES_PER_PAGE = 45;
+
     private final Plugin plugin;
     private final AreaManager areaManager;
     private final SelectionListener selectionListener;
@@ -92,6 +107,7 @@ public class GuiManager {
                 || holder instanceof AreaMenuHolder
                 || holder instanceof CommandListMenuHolder
                 || holder instanceof MobListMenuHolder
+                || holder instanceof MobTypePickerHolder
                 || holder instanceof MobEditorMenuHolder
                 || holder instanceof MobEquipMenuHolder;
     }
@@ -366,12 +382,62 @@ public class GuiManager {
         }
 
         inv.setItem(49, buildItem(Material.EMERALD, ChatColor.GREEN + "Crear mob nuevo",
-                List.of(ChatColor.GRAY + "Click y escribí en el chat:",
-                        ChatColor.GRAY + "<id> <tipo>  (ej: guardia1 zombie)"),
+                List.of(ChatColor.GRAY + "Elegí el tipo con un huevo de spawn",
+                        ChatColor.GRAY + "y después le ponés el nombre/id."),
                 "create_mob", area.getName(), null));
         inv.setItem(45, buildItem(Material.ARROW, ChatColor.WHITE + "« Volver", List.of(), "back_area", area.getName(), null));
 
         player.openInventory(inv);
+    }
+
+    /** Selector paginado de tipo base, con huevos de spawn (o cabeza/spawner si el tipo no tiene huevo). */
+    public void openMobTypePicker(Player player, String areaName, int page) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+
+        int totalPages = Math.max(1, (int) Math.ceil(SPAWNABLE_TYPES.size() / (double) TYPES_PER_PAGE));
+        int safePage = Math.max(0, Math.min(page, totalPages - 1));
+
+        Inventory inv = Bukkit.createInventory(new MobTypePickerHolder(area.getName(), safePage), 54,
+                ChatColor.DARK_PURPLE + "Elegí el tipo (" + (safePage + 1) + "/" + totalPages + ")");
+        ((MobTypePickerHolder) inv.getHolder()).setInventory(inv);
+
+        int start = safePage * TYPES_PER_PAGE;
+        int end = Math.min(start + TYPES_PER_PAGE, SPAWNABLE_TYPES.size());
+        int slot = 0;
+        for (int i = start; i < end; i++, slot++) {
+            EntityType type = SPAWNABLE_TYPES.get(i);
+            inv.setItem(slot, buildItem(entityIcon(type), ChatColor.YELLOW + prettyName(type),
+                    List.of(ChatColor.YELLOW + "Click para elegir este tipo"),
+                    "pick_type", area.getName(), null, type.name()));
+        }
+
+        if (safePage > 0) {
+            inv.setItem(45, buildItem(Material.ARROW, ChatColor.WHITE + "« Página anterior",
+                    List.of(), "prev_type_page", area.getName(), safePage - 1));
+        }
+        inv.setItem(49, buildItem(Material.BARRIER, ChatColor.RED + "Cancelar", List.of(), "back_mob_list", area.getName(), null));
+        if (safePage < totalPages - 1) {
+            inv.setItem(53, buildItem(Material.ARROW, ChatColor.WHITE + "Página siguiente »",
+                    List.of(), "next_type_page", area.getName(), safePage + 1));
+        }
+
+        player.openInventory(inv);
+    }
+
+    private String prettyName(EntityType type) {
+        String[] words = type.name().toLowerCase(Locale.ROOT).split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            if (word.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return sb.toString();
     }
 
     private ItemStack buildMobIcon(MobSpawnDefinition mob) {
@@ -575,6 +641,8 @@ public class GuiManager {
             handleCommandListAction(player, h.getAreaName(), h.getType(), action, index);
         } else if (holder instanceof MobListMenuHolder h) {
             handleMobListAction(player, h.getAreaName(), action, itemMobId);
+        } else if (holder instanceof MobTypePickerHolder h) {
+            handleMobTypePickerAction(player, h.getAreaName(), action, index, itemMobId);
         } else if (holder instanceof MobEditorMenuHolder h) {
             handleMobEditorAction(player, h.getAreaName(), h.getMobId(), action, event);
         } else if (holder instanceof MobEquipMenuHolder h) {
@@ -709,10 +777,34 @@ public class GuiManager {
         switch (action) {
             case "back_area" -> openAreaMenu(player, areaName);
             case "open_mob" -> openMobEditorMenu(player, areaName, mobId);
-            case "create_mob" -> {
-                pendingInputs.put(player.getUniqueId(), PendingInput.createMob(areaName));
+            case "create_mob" -> openMobTypePicker(player, areaName, 0);
+            default -> { }
+        }
+    }
+
+    private void handleMobTypePickerAction(Player player, String areaName, String action, Integer page, String typeNameOrNull) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+
+        switch (action) {
+            case "back_mob_list" -> openMobListMenu(player, areaName);
+            case "prev_type_page", "next_type_page" -> openMobTypePicker(player, areaName, page != null ? page : 0);
+            case "pick_type" -> {
+                EntityType type;
+                try {
+                    type = EntityType.valueOf(typeNameOrNull);
+                } catch (IllegalArgumentException | NullPointerException e) {
+                    player.sendMessage(ChatColor.RED + "Tipo inválido, probá de nuevo.");
+                    return;
+                }
+                pendingInputs.put(player.getUniqueId(), PendingInput.createMob(areaName, type));
                 player.closeInventory();
-                player.sendMessage(ChatColor.GREEN + "Escribí en el chat: <id> <tipo>  (ej: guardia1 zombie), o 'cancelar'.");
+                player.sendMessage(ChatColor.GREEN + "Elegiste " + prettyName(type) + ". Ahora escribí en el chat "
+                        + "el id para este mob (ej: guardia1), o 'cancelar'.");
             }
             default -> { }
         }
@@ -882,7 +974,7 @@ public class GuiManager {
         switch (pending.getKind()) {
             case CREATE_AREA -> createAreaFromChat(player, message.trim());
             case ADD_COMMAND -> addCommandFromChat(player, pending.getAreaName(), pending.getListType(), message);
-            case CREATE_MOB -> createMobFromChat(player, pending.getAreaName(), message.trim());
+            case CREATE_MOB -> createMobFromChat(player, pending.getAreaName(), pending.getMobType(), message.trim());
             case SET_MOB_NAME -> setMobNameFromChat(player, pending.getAreaName(), pending.getMobId(), message);
             case SET_MOB_TAG -> setMobTagFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
             case SET_MOB_LOOT -> setMobLootFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
@@ -927,30 +1019,20 @@ public class GuiManager {
         openCommandListMenu(player, areaName, type);
     }
 
-    private void createMobFromChat(Player player, String areaName, String text) {
+    private void createMobFromChat(Player player, String areaName, EntityType type, String text) {
         DungeonArea area = areaManager.getArea(areaName);
         if (area == null) {
             player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
             return;
         }
-        String[] parts = text.split("\\s+");
-        if (parts.length < 2) {
-            player.sendMessage(ChatColor.RED + "Formato inválido. Escribí: <id> <tipo>  (ej: guardia1 zombie)");
+        String id = text.split("\\s+")[0];
+        if (id.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "El id no puede estar vacío.");
             openMobListMenu(player, areaName);
             return;
         }
-        String id = parts[0];
         if (area.getMob(id) != null) {
             player.sendMessage(ChatColor.RED + "Ya existe un mob '" + id + "' en esta área.");
-            openMobListMenu(player, areaName);
-            return;
-        }
-        EntityType type;
-        try {
-            type = EntityType.valueOf(parts[1].toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            player.sendMessage(ChatColor.RED + "Tipo de entidad inválido: " + parts[1]
-                    + " (ej: ZOMBIE, SKELETON, SPIDER, CREEPER...).");
             openMobListMenu(player, areaName);
             return;
         }
