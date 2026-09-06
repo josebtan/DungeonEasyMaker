@@ -23,7 +23,19 @@ jobs:
           cache: maven
 
       - name: Compilar con Maven
-        run: mvn -B package --file pom.xml
+        id: build
+        run: mvn -B package --file pom.xml 2>&1 | tee build.log
+        continue-on-error: true
+
+      - name: Reportar errores de compilación como anotaciones
+        if: steps.build.outcome == 'failure'
+        run: |
+          grep -E "^\[ERROR\]" build.log | while IFS= read -r line; do
+            clean=$(echo "$line" | sed 's/^\[ERROR\] //')
+            echo "::error::${clean}"
+          done
+          echo "El build falló, ver anotaciones arriba."
+          exit 1
 
       - name: Subir el .jar como artefacto
         uses: actions/upload-artifact@v4
