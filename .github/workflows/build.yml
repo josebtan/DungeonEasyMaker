@@ -24,7 +24,10 @@ jobs:
 
       - name: Compilar con Maven
         id: build
-        run: mvn -B package --file pom.xml 2>&1 | tee build.log
+        run: |
+          set -o pipefail
+          mvn -B package --file pom.xml 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
         continue-on-error: true
 
       - name: Reportar errores de compilación como anotaciones
