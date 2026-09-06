@@ -23,11 +23,13 @@ public class AreaModule {
     private final Plugin plugin;
     private final AreaManager areaManager;
     private final SelectionListener selectionListener;
+    private final MobConfigModule mobConfigModule;
 
     public AreaModule(Plugin plugin, AreaManager areaManager, SelectionListener selectionListener) {
         this.plugin = plugin;
         this.areaManager = areaManager;
         this.selectionListener = selectionListener;
+        this.mobConfigModule = new MobConfigModule(areaManager);
     }
 
     public boolean handle(CommandSender sender, String[] args) {
@@ -55,6 +57,8 @@ public class AreaModule {
                 return handleAddStart(sender, args);
             case "addstarthere":
                 return handleAddStartHere(sender, args);
+            case "mob":
+                return mobConfigModule.handle(sender, Arrays.copyOfRange(args, 1, args.length));
             case "remove":
                 return handleRemove(sender, args);
             case "list":
@@ -86,6 +90,8 @@ public class AreaModule {
         sender.sendMessage(ChatColor.RED + "/dem area setwindow <nombre> <segundos>  (0 = desactivar)");
         sender.sendMessage(ChatColor.RED + "/dem area addstart <nombre> <comando>  (corre 1 vez al cerrar la ventana)");
         sender.sendMessage(ChatColor.RED + "/dem area addstarthere <comando>");
+        sender.sendMessage(ChatColor.RED + "/dem area mob <create|setname|sethealth|setscale|setspeed|setdelay|"
+                + "setamount|setspawnhere|addeffect|removeeffect|settag|setloot|setequip|toggle*|remove|list|info>");
         sender.sendMessage(ChatColor.RED + "/dem area select <nombre>");
         sender.sendMessage(ChatColor.RED + "/dem area unselect");
         sender.sendMessage(ChatColor.RED + "/dem area here");
@@ -423,6 +429,8 @@ public class AreaModule {
             sender.sendMessage(ChatColor.AQUA + "Ventana de ingreso: " + area.getJoinWindowSeconds() + "s");
             sender.sendMessage(ChatColor.AQUA + "Comandos de arranque (corren 1 sola vez):");
             area.getStartCommands().forEach(c -> sender.sendMessage(ChatColor.GRAY + " - " + c));
+            sender.sendMessage(ChatColor.AQUA + "Mobs configurados: " + area.getMobsById().size()
+                    + " (usa /dem area mob list " + area.getName() + ")");
             String estado = area.isLocked() ? ("bloqueada, " + area.getJoiners().size() + " jugador(es) dentro")
                     : area.isWindowOpen() ? ("cuenta regresiva activa, " + area.getJoiners().size() + " unido(s)")
                     : "libre";
@@ -436,7 +444,7 @@ public class AreaModule {
     public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length == 1) {
             return filter(Arrays.asList("wand", "create", "addenter", "addleave", "addenterhere",
-                    "addleavehere", "setwindow", "addstart", "addstarthere",
+                    "addleavehere", "setwindow", "addstart", "addstarthere", "mob",
                     "select", "unselect", "here", "show", "remove", "list", "info"), args[0]);
         }
         boolean needsAreaName = args.length == 2 && Arrays.asList(

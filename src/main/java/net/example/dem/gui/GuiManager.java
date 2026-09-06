@@ -6,14 +6,20 @@ import net.example.dem.area.SelectionListener;
 import net.example.dem.gui.GuiHolders.AreaMenuHolder;
 import net.example.dem.gui.GuiHolders.CommandListMenuHolder;
 import net.example.dem.gui.GuiHolders.MainMenuHolder;
+import net.example.dem.gui.GuiHolders.MobEditorMenuHolder;
+import net.example.dem.gui.GuiHolders.MobEquipMenuHolder;
+import net.example.dem.gui.GuiHolders.MobListMenuHolder;
+import net.example.dem.mob.MobSpawnDefinition;
 import net.example.dem.util.AreaVisualizer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -23,7 +29,9 @@ import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -43,6 +51,17 @@ public class GuiManager {
 
     private static final String NAMESPACE = "dungeoncore";
 
+    // Posiciones fijas del "muñeco de papel" en el editor de equipamiento.
+    private static final Map<Integer, EquipmentSlot> EQUIP_SLOT_POSITIONS = new LinkedHashMap<>();
+    static {
+        EQUIP_SLOT_POSITIONS.put(10, EquipmentSlot.HEAD);
+        EQUIP_SLOT_POSITIONS.put(11, EquipmentSlot.CHEST);
+        EQUIP_SLOT_POSITIONS.put(12, EquipmentSlot.LEGS);
+        EQUIP_SLOT_POSITIONS.put(13, EquipmentSlot.FEET);
+        EQUIP_SLOT_POSITIONS.put(15, EquipmentSlot.HAND);
+        EQUIP_SLOT_POSITIONS.put(16, EquipmentSlot.OFF_HAND);
+    }
+
     private final Plugin plugin;
     private final AreaManager areaManager;
     private final SelectionListener selectionListener;
@@ -50,6 +69,7 @@ public class GuiManager {
     private final NamespacedKey actionKey;
     private final NamespacedKey areaKey;
     private final NamespacedKey indexKey;
+    private final NamespacedKey mobKey;
 
     private final Map<UUID, PendingInput> pendingInputs = new HashMap<>();
 
@@ -60,6 +80,7 @@ public class GuiManager {
         this.actionKey = new NamespacedKey(plugin, NAMESPACE + "_gui_action");
         this.areaKey = new NamespacedKey(plugin, NAMESPACE + "_gui_area");
         this.indexKey = new NamespacedKey(plugin, NAMESPACE + "_gui_index");
+        this.mobKey = new NamespacedKey(plugin, NAMESPACE + "_gui_mob");
     }
 
     public Plugin getPlugin() {
@@ -69,7 +90,37 @@ public class GuiManager {
     public boolean isDemGui(InventoryHolder holder) {
         return holder instanceof MainMenuHolder
                 || holder instanceof AreaMenuHolder
-                || holder instanceof CommandListMenuHolder;
+                || holder instanceof CommandListMenuHolder
+                || holder instanceof MobListMenuHolder
+                || holder instanceof MobEditorMenuHolder
+                || holder instanceof MobEquipMenuHolder;
+    }
+
+    /**
+     * Para el editor de equipamiento: las posiciones del muñeco de papel se
+     * dejan pasar sin cancelar (necesitan comportamiento normal de inventario
+     * para poder poner/sacar ítems); todo lo demás en ese menú sí se cancela.
+     */
+    public boolean isFreeInteractSlot(InventoryHolder holder, int rawSlot) {
+        return holder instanceof MobEquipMenuHolder && EQUIP_SLOT_POSITIONS.containsKey(rawSlot);
+    }
+
+    /**
+     * Si el jugador cierra el editor de equipamiento sin apretar "Guardar y
+     * volver", cualquier ítem que haya puesto en los slots del muñeco de
+     * papel se le devuelve (si no, se perdería: el inventario del GUI es
+     * descartable y no vuelve a existir).
+     */
+    public void returnEquipItemsOnClose(Player player, Inventory inv) {
+        for (Integer slot : EQUIP_SLOT_POSITIONS.keySet()) {
+            ItemStack item = inv.getItem(slot);
+            if (item != null && !item.getType().isAir()) {
+                Map<Integer, ItemStack> leftover = player.getInventory().addItem(item.clone());
+                for (ItemStack extra : leftover.values()) {
+                    player.getWorld().dropItemNaturally(player.getLocation(), extra);
+                }
+            }
+        }
     }
 
     public boolean hasPendingInput(UUID uuid) {
@@ -178,6 +229,13 @@ public class GuiManager {
                         ChatColor.GRAY + "cerrar la ventana de ingreso"),
                 "open_start", area.getName(), null));
 
+        inv.setItem(16, buildItem(Material.ZOMBIE_HEAD,
+                ChatColor.DARK_GREEN + "Mobs (" + area.getMobsById().size() + ")",
+                List.of(ChatColor.GRAY + "Mobs personalizados de esta área.",
+                        ChatColor.GRAY + "Aparecen junto con los comandos",
+                        ChatColor.GRAY + "de arranque, en su posición fija."),
+                "open_mobs", area.getName(), null));
+
         inv.setItem(20, buildItem(Material.CLOCK,
                 ChatColor.GOLD + "Ventana de ingreso: " + area.getJoinWindowSeconds() + "s",
                 buildWindowLore(area), "window", area.getName(), null));
@@ -285,6 +343,213 @@ public class GuiManager {
     }
 
     // ----------------------------------------------------------------
+    // Menú de mobs de un área
+    // ----------------------------------------------------------------
+
+    public void openMobListMenu(Player player, String areaName) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+
+        Inventory inv = Bukkit.createInventory(new MobListMenuHolder(area.getName()), 54,
+                ChatColor.DARK_PURPLE + "Mobs: " + area.getName());
+        ((MobListMenuHolder) inv.getHolder()).setInventory(inv);
+
+        int slot = 0;
+        for (MobSpawnDefinition mob : area.getMobs()) {
+            if (slot >= 45) break;
+            inv.setItem(slot, buildMobIcon(mob));
+            slot++;
+        }
+
+        inv.setItem(49, buildItem(Material.EMERALD, ChatColor.GREEN + "Crear mob nuevo",
+                List.of(ChatColor.GRAY + "Click y escribí en el chat:",
+                        ChatColor.GRAY + "<id> <tipo>  (ej: guardia1 zombie)"),
+                "create_mob", area.getName(), null));
+        inv.setItem(45, buildItem(Material.ARROW, ChatColor.WHITE + "« Volver", List.of(), "back_area", area.getName(), null));
+
+        player.openInventory(inv);
+    }
+
+    private ItemStack buildMobIcon(MobSpawnDefinition mob) {
+        List<String> lore = new ArrayList<>();
+        lore.add(ChatColor.GRAY + "Tipo: " + mob.getBaseType());
+        lore.add(ChatColor.GRAY + "Vida: " + mob.getHealth() + "  Escala: " + mob.getScale());
+        lore.add(ChatColor.GRAY + "Delay: " + mob.getDelaySeconds() + "s  Cantidad: " + mob.getAmount());
+        lore.add(mob.hasSpawnLocation()
+                ? ChatColor.GREEN + "Posición configurada"
+                : ChatColor.RED + "Sin posición (usá 'Fijar posición aquí')");
+        lore.add("");
+        lore.add(ChatColor.YELLOW + "Click para editar");
+        String display = mob.getDisplayName() != null ? mob.getDisplayName() : mob.getId();
+        return buildItem(entityIcon(mob.getBaseType()), ChatColor.GOLD + display, lore,
+                "open_mob", null, null, mob.getId());
+    }
+
+    /** Un ícono razonable para cada tipo de mob (huevo de spawn si existe, cabeza si no). */
+    private Material entityIcon(EntityType type) {
+        try {
+            Material egg = Material.valueOf(type.name() + "_SPAWN_EGG");
+            if (egg.isItem()) {
+                return egg;
+            }
+        } catch (IllegalArgumentException ignored) {
+        }
+        return switch (type) {
+            case ZOMBIE -> Material.ZOMBIE_HEAD;
+            case SKELETON -> Material.SKELETON_SKULL;
+            case WITHER_SKELETON -> Material.WITHER_SKELETON_SKULL;
+            case CREEPER -> Material.CREEPER_HEAD;
+            case PLAYER -> Material.PLAYER_HEAD;
+            default -> Material.SPAWNER;
+        };
+    }
+
+    public void openMobEditorMenu(Player player, String areaName, String mobId) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+        MobSpawnDefinition mob = area.getMob(mobId);
+        if (mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            openMobListMenu(player, areaName);
+            return;
+        }
+
+        Inventory inv = Bukkit.createInventory(new MobEditorMenuHolder(area.getName(), mob.getId()), 54,
+                ChatColor.DARK_PURPLE + "Mob: " + mob.getId());
+        ((MobEditorMenuHolder) inv.getHolder()).setInventory(inv);
+
+        inv.setItem(10, buildItem(Material.NAME_TAG, ChatColor.YELLOW + "Nombre",
+                List.of(ChatColor.GRAY + "Actual: " + (mob.getDisplayName() == null ? "(sin nombre)" : mob.getDisplayName()),
+                        ChatColor.YELLOW + "Click para escribirlo en el chat"),
+                "edit_name", null, null, mob.getId()));
+
+        inv.setItem(11, buildItem(Material.APPLE, ChatColor.RED + "Vida: " + mob.getHealth(),
+                List.of(ChatColor.YELLOW + "Click izq: +1   Click der: -1",
+                        ChatColor.YELLOW + "Shift+izq: +10   Shift+der: -10"),
+                "edit_health", null, null, mob.getId()));
+
+        inv.setItem(12, buildItem(Material.SLIME_BALL, ChatColor.LIGHT_PURPLE + "Escala: " + round2(mob.getScale()),
+                List.of(ChatColor.YELLOW + "Click izq: +0.25   Click der: -0.25",
+                        ChatColor.YELLOW + "Shift+izq: +1   Shift+der: -1"),
+                "edit_scale", null, null, mob.getId()));
+
+        inv.setItem(13, buildItem(Material.SUGAR, ChatColor.AQUA + "Velocidad: "
+                        + (mob.getSpeed() < 0 ? "por defecto" : round2(mob.getSpeed())),
+                List.of(ChatColor.GRAY + "-1 = usa la del mob vanilla",
+                        ChatColor.YELLOW + "Click izq: +0.05   Click der: -0.05",
+                        ChatColor.YELLOW + "Shift+click: vuelve a 'por defecto'"),
+                "edit_speed", null, null, mob.getId()));
+
+        inv.setItem(14, buildItem(Material.CLOCK, ChatColor.GOLD + "Delay: " + mob.getDelaySeconds() + "s",
+                List.of(ChatColor.YELLOW + "Click izq: +1s   Click der: -1s",
+                        ChatColor.YELLOW + "Shift+izq: +5s   Shift+der: -5s"),
+                "edit_delay", null, null, mob.getId()));
+
+        inv.setItem(15, buildItem(Material.TOTEM_OF_UNDYING, ChatColor.GREEN + "Cantidad: " + mob.getAmount(),
+                List.of(ChatColor.YELLOW + "Click izq: +1   Click der: -1",
+                        ChatColor.YELLOW + "Shift+izq: +5   Shift+der: -5"),
+                "edit_amount", null, null, mob.getId()));
+
+        inv.setItem(19, buildItem(Material.COMPASS, ChatColor.AQUA + "Fijar posición aquí",
+                List.of(mob.hasSpawnLocation() ? ChatColor.GREEN + "Ya tiene posición configurada"
+                                : ChatColor.RED + "Todavía no tiene posición",
+                        ChatColor.YELLOW + "Click para usar tu ubicación actual"),
+                "set_spawn_here", null, null, mob.getId()));
+
+        inv.setItem(20, buildItem(Material.IRON_CHESTPLATE, ChatColor.GOLD + "Equipamiento ("
+                        + mob.getEquipment().size() + "/6)",
+                List.of(ChatColor.GRAY + "Casco, pecho, piernas, botas,",
+                        ChatColor.GRAY + "mano y mano secundaria.",
+                        ChatColor.YELLOW + "Click para abrir"),
+                "open_equip", null, null, mob.getId()));
+
+        inv.setItem(21, buildItem(Material.POTION, ChatColor.DARK_AQUA + "Efectos (" + mob.getPotionEffects().size() + ")",
+                List.of(ChatColor.YELLOW + "Click: agregar (escribí en el chat",
+                        ChatColor.YELLOW + "\"tipo amplificador segundos\")",
+                        ChatColor.YELLOW + "Shift+click: borra el último"),
+                "edit_effect", null, null, mob.getId()));
+
+        inv.setItem(22, buildItem(Material.NAME_TAG, ChatColor.YELLOW + "Etiqueta",
+                List.of(ChatColor.GRAY + "Actual: " + (mob.getTag() == null ? "(ninguna)" : mob.getTag()),
+                        ChatColor.GRAY + "Para usar con /dem objective watch",
+                        ChatColor.YELLOW + "Click para escribirla ('clear' para borrarla)"),
+                "edit_tag", null, null, mob.getId()));
+
+        inv.setItem(23, buildItem(Material.CHEST, ChatColor.YELLOW + "Loot al morir",
+                List.of(ChatColor.GRAY + "Actual: " + (mob.getLootTable() == null ? "(ninguna)" : mob.getLootTable()),
+                        ChatColor.YELLOW + "Click para escribir el nombre de la tabla",
+                        ChatColor.YELLOW + "('clear' para borrarla)"),
+                "edit_loot", null, null, mob.getId()));
+
+        inv.setItem(28, buildToggle(Material.REDSTONE_TORCH, "Sin IA", mob.isNoAi(), "toggle_ai", mob.getId()));
+        inv.setItem(29, buildToggle(Material.WOOL, "Silencioso", mob.isSilent(), "toggle_silent", mob.getId()));
+        inv.setItem(30, buildToggle(Material.SHIELD, "Invulnerable", mob.isInvulnerable(), "toggle_invulnerable", mob.getId()));
+        inv.setItem(31, buildToggle(Material.GLOWSTONE_DUST, "Brillante", mob.isGlowing(), "toggle_glow", mob.getId()));
+        inv.setItem(32, buildToggle(Material.EGG, "Bebé", mob.isBaby(), "toggle_baby", mob.getId()));
+
+        inv.setItem(49, buildItem(Material.BARRIER, ChatColor.RED + "Eliminar mob",
+                List.of(ChatColor.GRAY + "Shift + click para eliminar",
+                        ChatColor.GRAY + "(no se puede deshacer)"),
+                "delete_mob", null, null, mob.getId()));
+        inv.setItem(45, buildItem(Material.ARROW, ChatColor.WHITE + "« Volver", List.of(), "back_mobs", area.getName(), null));
+
+        player.openInventory(inv);
+    }
+
+    private ItemStack buildToggle(Material material, String label, boolean active, String action, String mobId) {
+        String name = (active ? ChatColor.GREEN + "✔ " : ChatColor.GRAY + "✘ ") + label;
+        List<String> lore = List.of(ChatColor.YELLOW + "Click para " + (active ? "desactivar" : "activar"));
+        return buildItem(material, name, lore, action, null, null, mobId);
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    public void openMobEquipMenu(Player player, String areaName, String mobId) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+        MobSpawnDefinition mob = area.getMob(mobId);
+        if (mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            openMobListMenu(player, areaName);
+            return;
+        }
+
+        Inventory inv = Bukkit.createInventory(new MobEquipMenuHolder(area.getName(), mob.getId()), 27,
+                ChatColor.DARK_PURPLE + "Equipo: " + mob.getId());
+        ((MobEquipMenuHolder) inv.getHolder()).setInventory(inv);
+
+        ItemStack filler = buildItem(Material.GRAY_STAINED_GLASS_PANE, " ", List.of(), "noop", null, null);
+        for (int i = 0; i < 27; i++) {
+            inv.setItem(i, filler.clone());
+        }
+        for (Map.Entry<Integer, EquipmentSlot> entry : EQUIP_SLOT_POSITIONS.entrySet()) {
+            ItemStack current = mob.getEquipment().get(entry.getValue());
+            inv.setItem(entry.getKey(), current != null ? current.clone() : new ItemStack(Material.AIR));
+        }
+        inv.setItem(22, buildItem(Material.LIME_DYE, ChatColor.GREEN + "Guardar y volver",
+                List.of(ChatColor.GRAY + "Guarda lo que haya en cada slot",
+                        ChatColor.GRAY + "(casco, pecho, piernas, botas,",
+                        ChatColor.GRAY + "mano, mano secundaria)"),
+                "save_equip", null, null, null));
+
+        player.openInventory(inv);
+    }
+
+    // ----------------------------------------------------------------
     // Manejo de clicks
     // ----------------------------------------------------------------
 
@@ -299,6 +564,7 @@ public class GuiManager {
             return;
         }
         Integer index = meta.getPersistentDataContainer().get(indexKey, PersistentDataType.INTEGER);
+        String itemMobId = meta.getPersistentDataContainer().get(mobKey, PersistentDataType.STRING);
 
         if (holder instanceof MainMenuHolder) {
             String areaName = meta.getPersistentDataContainer().get(areaKey, PersistentDataType.STRING);
@@ -307,6 +573,12 @@ public class GuiManager {
             handleAreaMenuAction(player, h.getAreaName(), action, event);
         } else if (holder instanceof CommandListMenuHolder h) {
             handleCommandListAction(player, h.getAreaName(), h.getType(), action, index);
+        } else if (holder instanceof MobListMenuHolder h) {
+            handleMobListAction(player, h.getAreaName(), action, itemMobId);
+        } else if (holder instanceof MobEditorMenuHolder h) {
+            handleMobEditorAction(player, h.getAreaName(), h.getMobId(), action, event);
+        } else if (holder instanceof MobEquipMenuHolder h) {
+            handleMobEquipAction(player, h.getAreaName(), h.getMobId(), action);
         }
     }
 
@@ -376,6 +648,7 @@ public class GuiManager {
             case "open_enter" -> openCommandListMenu(player, areaName, CommandListType.ENTER);
             case "open_leave" -> openCommandListMenu(player, areaName, CommandListType.LEAVE);
             case "open_start" -> openCommandListMenu(player, areaName, CommandListType.START);
+            case "open_mobs" -> openMobListMenu(player, areaName);
             case "window" -> {
                 int delta = event.isShiftClick() ? 30 : 5;
                 if (event.isRightClick()) delta = -delta;
@@ -425,6 +698,172 @@ public class GuiManager {
         }
     }
 
+    private void handleMobListAction(Player player, String areaName, String action, String mobId) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+
+        switch (action) {
+            case "back_area" -> openAreaMenu(player, areaName);
+            case "open_mob" -> openMobEditorMenu(player, areaName, mobId);
+            case "create_mob" -> {
+                pendingInputs.put(player.getUniqueId(), PendingInput.createMob(areaName));
+                player.closeInventory();
+                player.sendMessage(ChatColor.GREEN + "Escribí en el chat: <id> <tipo>  (ej: guardia1 zombie), o 'cancelar'.");
+            }
+            default -> { }
+        }
+    }
+
+    private void handleMobEditorAction(Player player, String areaName, String mobId, String action, InventoryClickEvent event) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+        MobSpawnDefinition mob = area.getMob(mobId);
+        if (mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            openMobListMenu(player, areaName);
+            return;
+        }
+
+        boolean shift = event.isShiftClick();
+        boolean right = event.isRightClick();
+
+        switch (action) {
+            case "back_mobs" -> openMobListMenu(player, areaName);
+            case "edit_name" -> {
+                pendingInputs.put(player.getUniqueId(), PendingInput.mobField(PendingInput.Kind.SET_MOB_NAME, areaName, mobId));
+                player.closeInventory();
+                player.sendMessage(ChatColor.GREEN + "Escribí el nombre en el chat (soporta &colores), o 'cancelar'.");
+            }
+            case "edit_health" -> {
+                double delta = shift ? 10 : 1;
+                if (right) delta = -delta;
+                mob.setHealth(mob.getHealth() + delta);
+                areaManager.save();
+                openMobEditorMenu(player, areaName, mobId);
+            }
+            case "edit_scale" -> {
+                double delta = shift ? 1.0 : 0.25;
+                if (right) delta = -delta;
+                mob.setScale(mob.getScale() + delta);
+                areaManager.save();
+                openMobEditorMenu(player, areaName, mobId);
+            }
+            case "edit_speed" -> {
+                if (shift) {
+                    mob.setSpeed(-1);
+                } else {
+                    double base = mob.getSpeed() < 0 ? 0 : mob.getSpeed();
+                    double delta = right ? -0.05 : 0.05;
+                    mob.setSpeed(Math.max(0, base + delta));
+                }
+                areaManager.save();
+                openMobEditorMenu(player, areaName, mobId);
+            }
+            case "edit_delay" -> {
+                int delta = shift ? 5 : 1;
+                if (right) delta = -delta;
+                mob.setDelaySeconds(mob.getDelaySeconds() + delta);
+                areaManager.save();
+                openMobEditorMenu(player, areaName, mobId);
+            }
+            case "edit_amount" -> {
+                int delta = shift ? 5 : 1;
+                if (right) delta = -delta;
+                mob.setAmount(mob.getAmount() + delta);
+                areaManager.save();
+                openMobEditorMenu(player, areaName, mobId);
+            }
+            case "set_spawn_here" -> {
+                mob.setSpawnLocation(player.getLocation());
+                areaManager.save();
+                player.sendMessage(ChatColor.GREEN + "Posición de '" + mob.getId() + "' fijada en tu ubicación actual.");
+                openMobEditorMenu(player, areaName, mobId);
+            }
+            case "open_equip" -> openMobEquipMenu(player, areaName, mobId);
+            case "edit_effect" -> {
+                if (shift) {
+                    if (!mob.getPotionEffects().isEmpty()) {
+                        mob.getPotionEffects().remove(mob.getPotionEffects().size() - 1);
+                        areaManager.save();
+                        player.sendMessage(ChatColor.YELLOW + "Se borró el último efecto de '" + mob.getId() + "'.");
+                    }
+                    openMobEditorMenu(player, areaName, mobId);
+                } else {
+                    pendingInputs.put(player.getUniqueId(), PendingInput.mobField(PendingInput.Kind.ADD_MOB_EFFECT, areaName, mobId));
+                    player.closeInventory();
+                    player.sendMessage(ChatColor.GREEN + "Escribí en el chat: <efecto> <amplificador> <segundos> "
+                            + "(ej: speed 1 30), o 'cancelar'.");
+                }
+            }
+            case "edit_tag" -> {
+                pendingInputs.put(player.getUniqueId(), PendingInput.mobField(PendingInput.Kind.SET_MOB_TAG, areaName, mobId));
+                player.closeInventory();
+                player.sendMessage(ChatColor.GREEN + "Escribí la etiqueta en el chat ('clear' para borrarla), o 'cancelar'.");
+            }
+            case "edit_loot" -> {
+                pendingInputs.put(player.getUniqueId(), PendingInput.mobField(PendingInput.Kind.SET_MOB_LOOT, areaName, mobId));
+                player.closeInventory();
+                player.sendMessage(ChatColor.GREEN + "Escribí el nombre de la tabla de loot en el chat "
+                        + "('clear' para borrarla), o 'cancelar'.");
+            }
+            case "toggle_ai" -> { mob.setNoAi(!mob.isNoAi()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
+            case "toggle_silent" -> { mob.setSilent(!mob.isSilent()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
+            case "toggle_invulnerable" -> { mob.setInvulnerable(!mob.isInvulnerable()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
+            case "toggle_glow" -> { mob.setGlowing(!mob.isGlowing()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
+            case "toggle_baby" -> { mob.setBaby(!mob.isBaby()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
+            case "delete_mob" -> {
+                if (shift) {
+                    area.removeMob(mob.getId());
+                    areaManager.save();
+                    player.sendMessage(ChatColor.YELLOW + "Mob '" + mob.getId() + "' eliminado.");
+                    openMobListMenu(player, areaName);
+                } else {
+                    player.sendMessage(ChatColor.RED + "Mantené shift y hacé click para confirmar la eliminación.");
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private void handleMobEquipAction(Player player, String areaName, String mobId, String action) {
+        if (!"save_equip".equals(action)) {
+            return; // los slots del muñeco de papel no llevan acción (se manejan sin cancelar)
+        }
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+        MobSpawnDefinition mob = area.getMob(mobId);
+        if (mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            openMobListMenu(player, areaName);
+            return;
+        }
+
+        Inventory inv = player.getOpenInventory().getTopInventory();
+        for (Map.Entry<Integer, EquipmentSlot> entry : EQUIP_SLOT_POSITIONS.entrySet()) {
+            ItemStack item = inv.getItem(entry.getKey());
+            if (item == null || item.getType().isAir()) {
+                mob.getEquipment().remove(entry.getValue());
+            } else {
+                mob.getEquipment().put(entry.getValue(), item.clone());
+            }
+        }
+        areaManager.save();
+        player.sendMessage(ChatColor.GREEN + "Equipamiento de '" + mob.getId() + "' guardado.");
+        openMobEditorMenu(player, areaName, mobId);
+    }
+
     // ----------------------------------------------------------------
     // Captura de chat (nombre de área nueva / comando nuevo)
     // ----------------------------------------------------------------
@@ -440,10 +879,14 @@ public class GuiManager {
             return;
         }
 
-        if (pending.getKind() == PendingInput.Kind.CREATE_AREA) {
-            createAreaFromChat(player, message.trim());
-        } else {
-            addCommandFromChat(player, pending.getAreaName(), pending.getListType(), message);
+        switch (pending.getKind()) {
+            case CREATE_AREA -> createAreaFromChat(player, message.trim());
+            case ADD_COMMAND -> addCommandFromChat(player, pending.getAreaName(), pending.getListType(), message);
+            case CREATE_MOB -> createMobFromChat(player, pending.getAreaName(), message.trim());
+            case SET_MOB_NAME -> setMobNameFromChat(player, pending.getAreaName(), pending.getMobId(), message);
+            case SET_MOB_TAG -> setMobTagFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
+            case SET_MOB_LOOT -> setMobLootFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
+            case ADD_MOB_EFFECT -> addMobEffectFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
         }
     }
 
@@ -484,12 +927,127 @@ public class GuiManager {
         openCommandListMenu(player, areaName, type);
     }
 
+    private void createMobFromChat(Player player, String areaName, String text) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            return;
+        }
+        String[] parts = text.split("\\s+");
+        if (parts.length < 2) {
+            player.sendMessage(ChatColor.RED + "Formato inválido. Escribí: <id> <tipo>  (ej: guardia1 zombie)");
+            openMobListMenu(player, areaName);
+            return;
+        }
+        String id = parts[0];
+        if (area.getMob(id) != null) {
+            player.sendMessage(ChatColor.RED + "Ya existe un mob '" + id + "' en esta área.");
+            openMobListMenu(player, areaName);
+            return;
+        }
+        EntityType type;
+        try {
+            type = EntityType.valueOf(parts[1].toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            player.sendMessage(ChatColor.RED + "Tipo de entidad inválido: " + parts[1]
+                    + " (ej: ZOMBIE, SKELETON, SPIDER, CREEPER...).");
+            openMobListMenu(player, areaName);
+            return;
+        }
+
+        MobSpawnDefinition mob = new MobSpawnDefinition(id, type);
+        area.addMob(mob);
+        areaManager.save();
+        player.sendMessage(ChatColor.GREEN + "Mob '" + id + "' (" + type + ") creado. Ahora fijale una posición "
+                + "parándote donde querés que aparezca.");
+        openMobEditorMenu(player, areaName, id);
+    }
+
+    private void setMobNameFromChat(Player player, String areaName, String mobId, String name) {
+        DungeonArea area = areaManager.getArea(areaName);
+        MobSpawnDefinition mob = area == null ? null : area.getMob(mobId);
+        if (area == null || mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            return;
+        }
+        mob.setDisplayName(name);
+        areaManager.save();
+        player.sendMessage(ChatColor.GREEN + "Nombre de '" + mob.getId() + "' actualizado.");
+        openMobEditorMenu(player, areaName, mobId);
+    }
+
+    private void setMobTagFromChat(Player player, String areaName, String mobId, String value) {
+        DungeonArea area = areaManager.getArea(areaName);
+        MobSpawnDefinition mob = area == null ? null : area.getMob(mobId);
+        if (area == null || mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            return;
+        }
+        mob.setTag(value.equalsIgnoreCase("clear") ? null : value);
+        areaManager.save();
+        player.sendMessage(ChatColor.GREEN + "Etiqueta de '" + mob.getId() + "' actualizada.");
+        openMobEditorMenu(player, areaName, mobId);
+    }
+
+    private void setMobLootFromChat(Player player, String areaName, String mobId, String value) {
+        DungeonArea area = areaManager.getArea(areaName);
+        MobSpawnDefinition mob = area == null ? null : area.getMob(mobId);
+        if (area == null || mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            return;
+        }
+        mob.setLootTable(value.equalsIgnoreCase("clear") ? null : value);
+        areaManager.save();
+        player.sendMessage(ChatColor.GREEN + "Tabla de loot de '" + mob.getId() + "' actualizada.");
+        openMobEditorMenu(player, areaName, mobId);
+    }
+
+    private void addMobEffectFromChat(Player player, String areaName, String mobId, String text) {
+        DungeonArea area = areaManager.getArea(areaName);
+        MobSpawnDefinition mob = area == null ? null : area.getMob(mobId);
+        if (area == null || mob == null) {
+            player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+            return;
+        }
+        String[] parts = text.split("\\s+");
+        if (parts.length < 3) {
+            player.sendMessage(ChatColor.RED + "Formato inválido. Escribí: <efecto> <amplificador> <segundos> (ej: speed 1 30)");
+            openMobEditorMenu(player, areaName, mobId);
+            return;
+        }
+        org.bukkit.potion.PotionEffectType effectType = org.bukkit.potion.PotionEffectType.getByName(parts[0].toUpperCase(Locale.ROOT));
+        if (effectType == null) {
+            player.sendMessage(ChatColor.RED + "Efecto inválido: " + parts[0] + " (ej: SPEED, STRENGTH, INVISIBILITY...).");
+            openMobEditorMenu(player, areaName, mobId);
+            return;
+        }
+        int amplifier = parseIntSafe(parts[1], 0);
+        int seconds = parseIntSafe(parts[2], 30);
+        mob.getPotionEffects().add(new MobSpawnDefinition.StoredPotionEffect(effectType, amplifier, seconds));
+        areaManager.save();
+        player.sendMessage(ChatColor.GREEN + "Efecto agregado a '" + mob.getId() + "'.");
+        openMobEditorMenu(player, areaName, mobId);
+    }
+
+    private int parseIntSafe(String raw, int fallback) {
+        try {
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
     // ----------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------
 
     private ItemStack buildItem(Material material, String name, List<String> lore,
                                  String action, String areaName, Integer index) {
+        return buildItem(material, name, lore, action, areaName, index, null);
+    }
+
+    private ItemStack buildItem(Material material, String name, List<String> lore,
+                                 String action, String areaName, Integer index, String mobId) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(name);
@@ -502,6 +1060,9 @@ public class GuiManager {
         }
         if (index != null) {
             meta.getPersistentDataContainer().set(indexKey, PersistentDataType.INTEGER, index);
+        }
+        if (mobId != null) {
+            meta.getPersistentDataContainer().set(mobKey, PersistentDataType.STRING, mobId);
         }
         item.setItemMeta(meta);
         return item;

@@ -50,6 +50,36 @@ tenés que escribir vos la lógica en el comando (por ejemplo con distintos
 - Si todos salen después de que ya arrancó (área bloqueada), se libera
   automáticamente para un nuevo intento.
 
+## Mobs personalizados por área
+
+Cada área puede tener sus propios mobs configurados (tipo CMI, pero nativo de
+DEM, sin depender de CMI para esto). Cada mob pertenece a UNA sola área y
+tiene una **posición de spawn fija**: se captura parándote en el lugar y
+usando "Fijar posición aquí" (GUI) o `/dem area mob setspawnhere` (comando).
+
+Los mobs de un área aparecen junto con los `start-commands`, cuando se cierra
+la ventana de ingreso (cada uno respeta su propio delay individual), y se
+eliminan solos cuando el área se libera.
+
+Por comando:
+```
+/dem area mob create nivel1 guardia1 zombie
+/dem area mob setspawnhere nivel1 guardia1     (parado donde debe aparecer)
+/dem area mob sethealth nivel1 guardia1 40
+/dem area mob setscale nivel1 guardia1 1.5
+/dem area mob setname nivel1 guardia1 &c&lGuardián
+/dem area mob setequip nivel1 guardia1 hand    (usa el ítem en tu mano)
+/dem area mob setloot nivel1 guardia1 nivel1_loot
+/dem area mob settag nivel1 guardia1 nivel1_[player]
+```
+
+O por GUI: `/dem gui` → elegí el área → botón "Mobs" → "Crear mob nuevo" →
+click en el mob para abrir su editor (vida, escala, velocidad, delay,
+cantidad, posición, efectos, etiqueta, loot, flags) → botón "Equipamiento"
+para un editor tipo muñeco de papel donde arrastrás ítems reales a cada slot.
+
+Requiere Paper 1.21+ (para la escala real de los mobs vía `Attribute.GENERIC_SCALE`).
+
 ## GUI de configuración (inventario)
 
 Para no tener que escribir comandos largos a mano, **`/dem gui`** (alias

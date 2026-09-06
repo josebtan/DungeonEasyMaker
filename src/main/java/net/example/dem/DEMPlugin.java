@@ -8,6 +8,7 @@ import net.example.dem.gui.GuiListener;
 import net.example.dem.gui.GuiManager;
 import net.example.dem.loot.LootManager;
 import net.example.dem.loot.LootModule;
+import net.example.dem.mob.MobDeathListener;
 import net.example.dem.objective.GuardDeathListener;
 import net.example.dem.objective.ObjectiveManager;
 import net.example.dem.objective.ObjectiveModule;
@@ -38,6 +39,7 @@ public class DEMPlugin extends JavaPlugin {
         lootManager = new LootManager(this);
         lootManager.load();
         LootModule lootModule = new LootModule(this, lootManager);
+        getServer().getPluginManager().registerEvents(new MobDeathListener(this, lootManager), this);
 
         // --- GUI de configuración (inventario) ---
         GuiManager guiManager = new GuiManager(this, areaManager, selectionListener);

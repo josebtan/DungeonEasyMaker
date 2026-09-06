@@ -1,12 +1,17 @@
 package net.example.dem.area;
 
+import net.example.dem.mob.MobSpawnDefinition;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Entity;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,12 +31,20 @@ public class DungeonArea {
     // (tal como están escritos, sin multiplicar por cantidad de jugadores).
     private final List<String> startCommands = new ArrayList<>();
 
+    // Mobs personalizados de ESTA área (id -> definición). Se disparan junto
+    // con startCommands al cerrarse la ventana de ingreso.
+    private final Map<String, MobSpawnDefinition> mobs = new LinkedHashMap<>();
+
     // Estado en vivo de la ventana. No se persiste en areas.yml: siempre
     // arranca "libre" cuando el plugin recarga o reinicia.
     private transient boolean windowOpen = false;
     private transient boolean locked = false;
     private final transient Set<UUID> joiners = new HashSet<>();
     private transient BukkitTask countdownTask;
+
+    // Entidades actualmente spawneadas por los mobs de esta área (de
+    // cualquier definición); se limpian solas al liberarse el área.
+    private final transient Set<UUID> spawnedMobEntities = new HashSet<>();
 
     public DungeonArea(String name, String world, int x1, int y1, int z1, int x2, int y2, int z2) {
         this.name = name;
@@ -92,6 +105,26 @@ public class DungeonArea {
         return startCommands;
     }
 
+    public Map<String, MobSpawnDefinition> getMobsById() {
+        return mobs;
+    }
+
+    public List<MobSpawnDefinition> getMobs() {
+        return new ArrayList<>(mobs.values());
+    }
+
+    public MobSpawnDefinition getMob(String id) {
+        return mobs.get(id.toLowerCase());
+    }
+
+    public void addMob(MobSpawnDefinition mob) {
+        mobs.put(mob.getId().toLowerCase(), mob);
+    }
+
+    public boolean removeMob(String id) {
+        return mobs.remove(id.toLowerCase()) != null;
+    }
+
     public boolean isWindowOpen() {
         return windowOpen;
     }
@@ -116,10 +149,32 @@ public class DungeonArea {
         this.countdownTask = task;
     }
 
+    public Set<UUID> getSpawnedMobEntities() {
+        return spawnedMobEntities;
+    }
+
+    /**
+     * Elimina del mundo todas las entidades que quedaron vivas de los mobs
+     * de esta área. Se llama automáticamente al liberarse el área.
+     */
+    public void despawnTrackedMobs() {
+        for (UUID uuid : spawnedMobEntities) {
+            Entity entity = Bukkit.getEntity(uuid);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        spawnedMobEntities.clear();
+        for (MobSpawnDefinition def : mobs.values()) {
+            def.getLiveEntities().clear();
+        }
+    }
+
     /**
      * Vuelve el área a su estado "libre": sin ventana abierta, sin bloqueo,
-     * sin jugadores registrados. Se usa cuando termina un intento (o cuando
-     * todos salen antes de que arranque) para que se pueda usar de nuevo.
+     * sin jugadores registrados, y sin mobs vivos de este intento. Se usa
+     * cuando termina un intento (o cuando todos salen antes de que arranque)
+     * para que se pueda usar de nuevo.
      */
     public void resetWindowState() {
         windowOpen = false;
@@ -129,5 +184,6 @@ public class DungeonArea {
             countdownTask.cancel();
             countdownTask = null;
         }
+        despawnTrackedMobs();
     }
 }

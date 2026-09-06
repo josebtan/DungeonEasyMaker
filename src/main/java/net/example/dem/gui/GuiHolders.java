@@ -71,4 +71,83 @@ public class GuiHolders {
             this.inventory = inventory;
         }
     }
+
+    public static class MobListMenuHolder implements InventoryHolder {
+        private final String areaName;
+        private Inventory inventory;
+
+        public MobListMenuHolder(String areaName) {
+            this.areaName = areaName;
+        }
+
+        public String getAreaName() {
+            return areaName;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
+        }
+    }
+
+    public static class MobEditorMenuHolder implements InventoryHolder {
+        private final String areaName;
+        private final String mobId;
+        private Inventory inventory;
+
+        public MobEditorMenuHolder(String areaName, String mobId) {
+            this.areaName = areaName;
+            this.mobId = mobId;
+        }
+
+        public String getAreaName() {
+            return areaName;
+        }
+
+        public String getMobId() {
+            return mobId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
+        }
+    }
+
+    /** Único menú "editable de verdad": los 6 slots centrales son un muñeco de papel real. */
+    public static class MobEquipMenuHolder implements InventoryHolder {
+        private final String areaName;
+        private final String mobId;
+        private Inventory inventory;
+
+        public MobEquipMenuHolder(String areaName, String mobId) {
+            this.areaName = areaName;
+            this.mobId = mobId;
+        }
+
+        public String getAreaName() {
+            return areaName;
+        }
+
+        public String getMobId() {
+            return mobId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+
+        public void setInventory(Inventory inventory) {
+            this.inventory = inventory;
+        }
+    }
 }

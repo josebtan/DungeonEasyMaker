@@ -5,6 +5,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.InventoryHolder;
 
@@ -22,18 +23,39 @@ public class GuiListener implements Listener {
         if (!guiManager.isDemGui(holder)) {
             return;
         }
-        // Siempre cancelamos: es un menú de solo-lectura/botones, nadie debe
-        // poder sacar o mover los items que arma el GUI.
+
+        boolean clickedTop = event.getClickedInventory() != null
+                && event.getClickedInventory().equals(event.getView().getTopInventory());
+
+        // El editor de equipamiento es el único menú "editable de verdad": sus
+        // 6 slots del muñeco de papel se dejan con comportamiento normal para
+        // poder poner/sacar ítems (incluso shift-click desde el inventario del
+        // jugador). Todo lo demás en el GUI se cancela como siempre.
+        if (clickedTop && guiManager.isFreeInteractSlot(holder, event.getSlot())) {
+            return;
+        }
+        if (!clickedTop && holder instanceof net.example.dem.gui.GuiHolders.MobEquipMenuHolder) {
+            return; // deja que el jugador maneje su propio inventario con normalidad
+        }
+
         event.setCancelled(true);
 
-        if (event.getClickedInventory() == null
-                || !event.getClickedInventory().equals(event.getView().getTopInventory())) {
+        if (!clickedTop) {
             return; // click en el inventario del jugador, no en el menú
         }
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
         guiManager.handleClick(player, holder, event);
+    }
+
+    @EventHandler
+    public void onClose(InventoryCloseEvent event) {
+        InventoryHolder holder = event.getInventory().getHolder();
+        if (holder instanceof net.example.dem.gui.GuiHolders.MobEquipMenuHolder
+                && event.getPlayer() instanceof Player player) {
+            guiManager.returnEquipItemsOnClose(player, event.getInventory());
+        }
     }
 
     @EventHandler

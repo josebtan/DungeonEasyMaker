@@ -1,5 +1,6 @@
 package net.example.dem.area;
 
+import net.example.dem.mob.MobSpawner;
 import net.example.dem.util.CommandRunner;
 import net.example.dem.util.PlaceholderContext;
 import org.bukkit.Bukkit;
@@ -26,7 +27,9 @@ import java.util.UUID;
  * al entrar el primer jugador arranca una cuenta regresiva para que se sumen más;
  * al terminar, el área se bloquea (no se puede entrar más) y los comandos de
  * "addstart" se ejecutan UNA sola vez, tal como están escritos (no se multiplican
- * por la cantidad de jugadores que entraron).
+ * por la cantidad de jugadores que entraron). Los mobs personalizados de la
+ * área (ver net.example.dem.mob) se spawnean en ese mismo momento, cada uno
+ * respetando su propio delay, y se despawnean solos cuando el área se libera.
  */
 public class AreaMoveListener implements org.bukkit.event.Listener {
 
@@ -150,6 +153,10 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
             context = PlaceholderContext.ofPlayerOnly("");
         }
         CommandRunner.runAll(plugin, area.getStartCommands(), context);
+
+        // Los mobs configurados para esta área (posición fija, delay propio)
+        // se disparan junto con los comandos de arranque.
+        MobSpawner.spawnAllForArea(plugin, area);
     }
 
     private void runCommands(List<String> commands, Player player, Location loc) {
