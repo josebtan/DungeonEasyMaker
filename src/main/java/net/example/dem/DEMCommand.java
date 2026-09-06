@@ -2,6 +2,8 @@ package net.example.dem;
 
 import net.example.dem.area.AreaManager;
 import net.example.dem.area.AreaModule;
+import net.example.dem.dungeon.DungeonManager;
+import net.example.dem.dungeon.DungeonModule;
 import net.example.dem.gui.GuiManager;
 import net.example.dem.loot.LootManager;
 import net.example.dem.loot.LootModule;
@@ -22,6 +24,7 @@ import java.util.List;
  *   /dem area ...
  *   /dem objective ...
  *   /dem loot ...
+ *   /dem dungeon ...
  *   /dem gui
  *   /dem reload
  */
@@ -33,16 +36,20 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
     private final ObjectiveModule objectiveModule;
     private final LootModule lootModule;
     private final GuiManager guiManager;
+    private final DungeonModule dungeonModule;
+    private final DungeonManager dungeonManager;
 
     public DEMCommand(AreaManager areaManager, LootManager lootManager,
                        AreaModule areaModule, ObjectiveModule objectiveModule, LootModule lootModule,
-                       GuiManager guiManager) {
+                       GuiManager guiManager, DungeonModule dungeonModule, DungeonManager dungeonManager) {
         this.areaManager = areaManager;
         this.lootManager = lootManager;
         this.areaModule = areaModule;
         this.objectiveModule = objectiveModule;
         this.lootModule = lootModule;
         this.guiManager = guiManager;
+        this.dungeonModule = dungeonModule;
+        this.dungeonManager = dungeonManager;
     }
 
     @Override
@@ -61,6 +68,8 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
                 return objectiveModule.handle(sender, rest);
             case "loot":
                 return lootModule.handle(sender, rest);
+            case "dungeon":
+                return dungeonModule.handle(sender, rest);
             case "gui":
             case "menu":
                 return handleGui(sender);
@@ -83,9 +92,10 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(ChatColor.RED + "Uso:");
-        sender.sendMessage(ChatColor.RED + "/dem area <wand|create|addenter|addleave|remove|list|info>");
+        sender.sendMessage(ChatColor.RED + "/dem area <wand|create|addenter|addleave|door|mob|remove|list|info>");
         sender.sendMessage(ChatColor.RED + "/dem objective <watch|reset|status>");
         sender.sendMessage(ChatColor.RED + "/dem loot <create|addentry|removeentry|list|roll>");
+        sender.sendMessage(ChatColor.RED + "/dem dungeon <create|setentrance|setkickpoint|complete|list|info>");
         sender.sendMessage(ChatColor.RED + "/dem gui  (menú de configuración por inventario)");
         sender.sendMessage(ChatColor.RED + "/dem reload");
     }
@@ -93,15 +103,17 @@ public class DEMCommand implements CommandExecutor, TabCompleter {
     private boolean handleReload(CommandSender sender) {
         areaManager.reload();
         lootManager.reload();
+        dungeonManager.load();
         sender.sendMessage(ChatColor.GREEN + "DEM recargado: " + areaManager.getAreas().size()
-                + " área(s) y " + lootManager.getTables().size() + " tabla(s) de loot cargadas desde disco.");
+                + " área(s), " + lootManager.getTables().size() + " tabla(s) de loot y "
+                + dungeonManager.getDungeons().size() + " dungeon(s) cargados desde disco.");
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(Arrays.asList("area", "objective", "loot", "gui", "reload"), args[0]);
+            return filter(Arrays.asList("area", "objective", "loot", "dungeon", "gui", "reload"), args[0]);
         }
 
         String[] rest = Arrays.copyOfRange(args, 1, args.length);

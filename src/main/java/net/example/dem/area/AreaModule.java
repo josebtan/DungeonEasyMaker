@@ -24,12 +24,14 @@ public class AreaModule {
     private final AreaManager areaManager;
     private final SelectionListener selectionListener;
     private final MobConfigModule mobConfigModule;
+    private final DoorConfigModule doorConfigModule;
 
     public AreaModule(Plugin plugin, AreaManager areaManager, SelectionListener selectionListener) {
         this.plugin = plugin;
         this.areaManager = areaManager;
         this.selectionListener = selectionListener;
         this.mobConfigModule = new MobConfigModule(areaManager);
+        this.doorConfigModule = new DoorConfigModule(areaManager, selectionListener);
     }
 
     public boolean handle(CommandSender sender, String[] args) {
@@ -59,6 +61,8 @@ public class AreaModule {
                 return handleAddStartHere(sender, args);
             case "mob":
                 return mobConfigModule.handle(sender, Arrays.copyOfRange(args, 1, args.length));
+            case "door":
+                return doorConfigModule.handle(sender, Arrays.copyOfRange(args, 1, args.length));
             case "remove":
                 return handleRemove(sender, args);
             case "list":
@@ -92,6 +96,7 @@ public class AreaModule {
         sender.sendMessage(ChatColor.RED + "/dem area addstarthere <comando>");
         sender.sendMessage(ChatColor.RED + "/dem area mob <create|setname|sethealth|setscale|setspeed|setdelay|"
                 + "setamount|setspawnhere|addeffect|removeeffect|settag|setloot|setequip|toggle*|remove|list|info>");
+        sender.sendMessage(ChatColor.RED + "/dem area door <create|open|close|remove|list|info>");
         sender.sendMessage(ChatColor.RED + "/dem area select <nombre>");
         sender.sendMessage(ChatColor.RED + "/dem area unselect");
         sender.sendMessage(ChatColor.RED + "/dem area here");
@@ -444,7 +449,7 @@ public class AreaModule {
     public List<String> tabComplete(CommandSender sender, String[] args) {
         if (args.length == 1) {
             return filter(Arrays.asList("wand", "create", "addenter", "addleave", "addenterhere",
-                    "addleavehere", "setwindow", "addstart", "addstarthere", "mob",
+                    "addleavehere", "setwindow", "addstart", "addstarthere", "mob", "door",
                     "select", "unselect", "here", "show", "remove", "list", "info"), args[0]);
         }
         boolean needsAreaName = args.length == 2 && Arrays.asList(

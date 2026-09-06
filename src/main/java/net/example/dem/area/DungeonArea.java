@@ -35,6 +35,9 @@ public class DungeonArea {
     // con startCommands al cerrarse la ventana de ingreso.
     private final Map<String, MobSpawnDefinition> mobs = new LinkedHashMap<>();
 
+    // Puertas físicas asociadas a esta área (id -> definición).
+    private final Map<String, DoorDefinition> doors = new LinkedHashMap<>();
+
     // Estado en vivo de la ventana. No se persiste en areas.yml: siempre
     // arranca "libre" cuando el plugin recarga o reinicia.
     private transient boolean windowOpen = false;
@@ -123,6 +126,22 @@ public class DungeonArea {
 
     public boolean removeMob(String id) {
         return mobs.remove(id.toLowerCase()) != null;
+    }
+
+    public Map<String, DoorDefinition> getDoorsById() {
+        return doors;
+    }
+
+    public DoorDefinition getDoor(String id) {
+        return doors.get(id.toLowerCase());
+    }
+
+    public void addDoor(DoorDefinition door) {
+        doors.put(door.getId().toLowerCase(), door);
+    }
+
+    public boolean removeDoor(String id) {
+        return doors.remove(id.toLowerCase()) != null;
     }
 
     public boolean isWindowOpen() {

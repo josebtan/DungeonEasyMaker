@@ -55,7 +55,39 @@ public class AreaManager {
             area.setJoinWindowSeconds(s.getInt("join-window-seconds", 0));
             area.getStartCommands().addAll(s.getStringList("start-commands"));
             loadMobs(s, area);
+            loadDoors(s, area);
             areas.put(name.toLowerCase(), area);
+        }
+    }
+
+    private void loadDoors(ConfigurationSection areaSection, DungeonArea area) {
+        ConfigurationSection doorsSection = areaSection.getConfigurationSection("doors");
+        if (doorsSection == null) {
+            return;
+        }
+        for (String doorId : doorsSection.getKeys(false)) {
+            ConfigurationSection ds = doorsSection.getConfigurationSection(doorId);
+            if (ds == null) continue;
+
+            String world = ds.getString("world");
+            if (world == null) continue;
+
+            List<DoorDefinition.CapturedBlock> blocks = new ArrayList<>();
+            for (Map<?, ?> raw : ds.getMapList("blocks")) {
+                try {
+                    int x = ((Number) raw.get("x")).intValue();
+                    int y = ((Number) raw.get("y")).intValue();
+                    int z = ((Number) raw.get("z")).intValue();
+                    String data = String.valueOf(raw.get("data"));
+                    blocks.add(new DoorDefinition.CapturedBlock(x, y, z, data));
+                } catch (Exception ignored) {
+                }
+            }
+
+            DoorDefinition door = new DoorDefinition(doorId, world,
+                    ds.getInt("min-x"), ds.getInt("min-y"), ds.getInt("min-z"),
+                    ds.getInt("max-x"), ds.getInt("max-y"), ds.getInt("max-z"), blocks);
+            area.addDoor(door);
         }
     }
 
@@ -170,12 +202,37 @@ public class AreaManager {
             config.set(base + ".join-window-seconds", area.getJoinWindowSeconds());
             config.set(base + ".start-commands", area.getStartCommands());
             saveMobs(config, base, area);
+            saveDoors(config, base, area);
         }
 
         try {
             config.save(file);
         } catch (IOException e) {
             plugin.getLogger().severe("No se pudo guardar areas.yml: " + e.getMessage());
+        }
+    }
+
+    private void saveDoors(FileConfiguration config, String areaBase, DungeonArea area) {
+        for (DoorDefinition door : area.getDoorsById().values()) {
+            String doorBase = areaBase + ".doors." + door.getId();
+            config.set(doorBase + ".world", door.getWorld());
+            config.set(doorBase + ".min-x", door.getMinX());
+            config.set(doorBase + ".min-y", door.getMinY());
+            config.set(doorBase + ".min-z", door.getMinZ());
+            config.set(doorBase + ".max-x", door.getMaxX());
+            config.set(doorBase + ".max-y", door.getMaxY());
+            config.set(doorBase + ".max-z", door.getMaxZ());
+
+            List<Map<String, Object>> serialized = new ArrayList<>();
+            for (DoorDefinition.CapturedBlock cb : door.getClosedBlocks()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("x", cb.x);
+                m.put("y", cb.y);
+                m.put("z", cb.z);
+                m.put("data", cb.blockData);
+                serialized.add(m);
+            }
+            config.set(doorBase + ".blocks", serialized);
         }
     }
 

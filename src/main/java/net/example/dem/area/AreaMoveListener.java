@@ -1,5 +1,7 @@
 package net.example.dem.area;
 
+import net.example.dem.dungeon.Dungeon;
+import net.example.dem.dungeon.DungeonManager;
 import net.example.dem.mob.MobSpawner;
 import net.example.dem.util.CommandRunner;
 import net.example.dem.util.PlaceholderContext;
@@ -35,12 +37,14 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
 
     private final Plugin plugin;
     private final AreaManager areaManager;
+    private final DungeonManager dungeonManager;
     // playerUUID -> set de nombres de áreas en las que está actualmente
     private final Map<UUID, Set<String>> playersInside = new HashMap<>();
 
-    public AreaMoveListener(Plugin plugin, AreaManager areaManager) {
+    public AreaMoveListener(Plugin plugin, AreaManager areaManager, DungeonManager dungeonManager) {
         this.plugin = plugin;
         this.areaManager = areaManager;
+        this.dungeonManager = dungeonManager;
     }
 
     @EventHandler
@@ -65,9 +69,12 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
 
             if (isInsideNow && !wasInsideBefore) {
                 if (area.getJoinWindowSeconds() > 0 && area.isLocked()) {
-                    // La ventana ya cerró y la dungeon arrancó: no se puede entrar
-                    // hasta que se libere (cuando todos salgan del área).
-                    event.setTo(from);
+                    // La ventana ya cerró: no se puede entrar hasta que se libere.
+                    // Si "from" también está adentro (llegó por /tp u otro comando
+                    // en vez de caminar), no alcanza con cancelar el movimiento:
+                    // hay que expulsarlo a un punto seguro afuera.
+                    Location safeSpot = area.contains(from) ? resolveKickSpot(area, player) : from;
+                    event.setTo(safeSpot);
                     player.sendMessage(ChatColor.RED + "'" + area.getName()
                             + "' ya comenzó. Espera a que termine para poder entrar.");
                     continue;
@@ -106,12 +113,40 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
         }
     }
 
+    /** A dónde mandar a alguien que apareció adentro de un área bloqueada sin haber caminado hasta ahí. */
+    private Location resolveKickSpot(DungeonArea area, Player player) {
+        Dungeon dungeon = dungeonManager.findDungeonByArea(area.getName());
+        if (dungeon != null && dungeon.hasKickPoint()) {
+            Location kick = dungeon.getKickLocation();
+            if (kick != null) {
+                return kick;
+            }
+        }
+        return player.getWorld().getSpawnLocation();
+    }
+
     private void handleWindowLeave(DungeonArea area, Player player) {
         area.getJoiners().remove(player.getUniqueId());
+        if (!area.isLocked()) {
+            return;
+        }
 
-        // Si ya había arrancado y el área se quedó sin nadie adentro, se libera
-        // automáticamente para que se pueda volver a intentar sin reload/reinicio.
-        if (area.isLocked() && area.getJoiners().isEmpty()) {
+        Dungeon dungeon = dungeonManager.findDungeonByArea(area.getName());
+        if (dungeon != null) {
+            // Esta área es una etapa de un dungeon encadenado: no se libera sola
+            // (es normal que se vacíe cuando el grupo avanza a la siguiente
+            // etapa). Solo se libera el dungeon ENTERO cuando no queda nadie en
+            // NINGUNA de sus etapas.
+            if (dungeon.isInProgress() && !dungeonManager.hasAnyoneInside(dungeon)) {
+                dungeonManager.release(dungeon);
+                Bukkit.broadcastMessage(ChatColor.GRAY + "[DEM] El dungeon '" + dungeon.getId()
+                        + "' quedó vacío y se liberó (entrada reabierta).");
+            }
+            return;
+        }
+
+        // Área independiente (no pertenece a ningún dungeon): comportamiento de siempre.
+        if (area.getJoiners().isEmpty()) {
             area.resetWindowState();
             Bukkit.broadcastMessage(ChatColor.GRAY + "[DEM] '" + area.getName()
                     + "' quedó vacía y se liberó para un nuevo intento.");
@@ -157,6 +192,13 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
         // Los mobs configurados para esta área (posición fija, delay propio)
         // se disparan junto con los comandos de arranque.
         MobSpawner.spawnAllForArea(plugin, area);
+
+        // Si esta área es la ENTRADA de un dungeon encadenado, arranca la
+        // corrida completa: marca participantes y cierra la puerta de entrada.
+        Dungeon dungeon = dungeonManager.findDungeonByArea(area.getName());
+        if (dungeon != null && dungeonManager.isEntranceStage(dungeon, area.getName())) {
+            dungeonManager.startDungeon(dungeon, joiners);
+        }
     }
 
     private void runCommands(List<String> commands, Player player, Location loc) {

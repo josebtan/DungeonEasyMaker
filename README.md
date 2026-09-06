@@ -50,6 +50,56 @@ tenés que escribir vos la lógica en el comando (por ejemplo con distintos
 - Si todos salen después de que ya arrancó (área bloqueada), se libera
   automáticamente para un nuevo intento.
 
+## Puertas físicas
+
+Una puerta es un cubo de bloques que capturás tal como lo construiste (su
+estado "cerrado"): abrir la rellena de aire, cerrar restaura exactamente lo
+que había. Mucho más simple que escribir `fill`/`setblock` a mano, y
+reversible.
+
+```
+/dem area wand
+[marcá las 2 esquinas de la puerta, ya construida]
+/dem area door create etapa1 puerta_a_etapa2
+/dem area door open etapa1 puerta_a_etapa2
+/dem area door close etapa1 puerta_a_etapa2
+```
+
+## Dungeons encadenados (varias etapas)
+
+Un dungeon agrupa una secuencia de áreas como una sola corrida. La primera
+etapa de la lista es la entrada: su puerta se cierra sola al arrancar y no
+se reabre hasta que se completan todas las etapas o el dungeon queda vacío
+(nadie parado en ninguna de sus etapas).
+
+```
+/dem dungeon create mi_dungeon etapa1 etapa2 etapa3
+/dem dungeon setentrance mi_dungeon etapa1 puerta_entrada
+/dem dungeon setkickpoint mi_dungeon        (parado afuera, en la salida)
+```
+
+En el `addstart` de cada etapa (menos la última), abrí la puerta a la
+siguiente en vez de un `fill` manual:
+```
+/dem area addstart etapa1 dem objective watch etapa1 3 broadcast &a¡Etapa 1 superada!~~dem area door open etapa2 puerta_a_etapa3
+```
+
+En la última etapa, liberá el dungeon completo en vez de solo abrir una puerta:
+```
+/dem area addstart etapa3 dem objective watch etapa3 1 broadcast &6¡Dungeon completada!~~dem dungeon complete mi_dungeon
+```
+
+Comportamiento automático que ya viene resuelto:
+- La entrada se cierra sola al arrancar, y **se ignora** cualquier intento de
+  entrar (caminando o por `/tp`/comandos similares) mientras el dungeon esté
+  en curso — te devuelve al punto de expulsión configurado.
+- Si morís dentro de cualquier etapa, quedás afuera (punto de expulsión) hasta
+  que el dungeon se libere; la corrida sigue para el resto del grupo.
+- Si todos los participantes salen (o mueren) antes de terminar, el dungeon
+  se libera solo: entrada reabierta y todas las etapas reseteadas.
+- `/dem dungeon complete <id>` o `/dem dungeon release <id>` fuerzan la
+  liberación manualmente si hace falta.
+
 ## Mobs personalizados por área
 
 Cada área puede tener sus propios mobs configurados (tipo CMI, pero nativo de
