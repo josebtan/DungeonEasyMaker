@@ -556,7 +556,7 @@ public class GuiManager {
                 "edit_loot", null, null, mob.getId()));
 
         inv.setItem(28, buildToggle(Material.REDSTONE_TORCH, "Sin IA", mob.isNoAi(), "toggle_ai", mob.getId()));
-        inv.setItem(29, buildToggle(Material.WOOL, "Silencioso", mob.isSilent(), "toggle_silent", mob.getId()));
+        inv.setItem(29, buildToggle(Material.WHITE_WOOL, "Silencioso", mob.isSilent(), "toggle_silent", mob.getId()));
         inv.setItem(30, buildToggle(Material.SHIELD, "Invulnerable", mob.isInvulnerable(), "toggle_invulnerable", mob.getId()));
         inv.setItem(31, buildToggle(Material.GLOWSTONE_DUST, "Brillante", mob.isGlowing(), "toggle_glow", mob.getId()));
         inv.setItem(32, buildToggle(Material.EGG, "Bebé", mob.isBaby(), "toggle_baby", mob.getId()));
