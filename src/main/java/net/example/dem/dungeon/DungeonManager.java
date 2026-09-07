@@ -49,8 +49,6 @@ public class DungeonManager {
 
             Dungeon dungeon = new Dungeon(id);
             dungeon.getStages().addAll(s.getStringList("stages"));
-            dungeon.setEntranceDoorArea(s.getString("entrance-door-area", null));
-            dungeon.setEntranceDoorId(s.getString("entrance-door-id", null));
             if (s.isSet("kick.world")) {
                 dungeon.loadRawKickPoint(
                         s.getString("kick.world"),
@@ -66,8 +64,6 @@ public class DungeonManager {
         for (Dungeon d : dungeons.values()) {
             String base = "dungeons." + d.getId();
             config.set(base + ".stages", d.getStages());
-            config.set(base + ".entrance-door-area", d.getEntranceDoorArea());
-            config.set(base + ".entrance-door-id", d.getEntranceDoorId());
             if (d.hasKickPoint()) {
                 config.set(base + ".kick.world", d.getKickWorld());
                 config.set(base + ".kick.x", d.getKickX());
@@ -127,52 +123,31 @@ public class DungeonManager {
         return false;
     }
 
-    private DoorDefinition resolveEntranceDoor(Dungeon dungeon) {
-        if (dungeon.getEntranceDoorArea() == null || dungeon.getEntranceDoorId() == null) {
-            return null;
-        }
-        DungeonArea area = areaManager.getArea(dungeon.getEntranceDoorArea());
-        if (area == null) {
-            return null;
-        }
-        return area.getDoor(dungeon.getEntranceDoorId());
-    }
-
-    public void closeEntrance(Dungeon dungeon) {
-        DoorDefinition door = resolveEntranceDoor(dungeon);
-        if (door != null) {
-            door.close();
-        }
-    }
-
-    public void openEntrance(Dungeon dungeon) {
-        DoorDefinition door = resolveEntranceDoor(dungeon);
-        if (door != null) {
-            door.open();
-        }
-    }
-
-    /** Arranca la corrida: marca los participantes y cierra la puerta de entrada. */
+    /** Arranca la corrida: solo marca los participantes. La puerta de entrada
+     * de la primera etapa ya se cierra sola (mecanismo genérico de cualquier
+     * área con entryDoorId, ver AreaMoveListener#closeWindow). */
     public void startDungeon(Dungeon dungeon, Set<UUID> joiners) {
         dungeon.setInProgress(true);
         dungeon.getParticipants().clear();
         dungeon.getParticipants().addAll(joiners);
-        closeEntrance(dungeon);
     }
 
     /**
-     * Libera todo el dungeon: reabre la entrada y resetea (desbloquea +
-     * despawnea mobs) cada una de sus etapas, hayan sido superadas o no.
+     * Libera todo el dungeon: resetea (desbloquea + despawnea mobs) cada
+     * etapa y reabre la puerta de entrada de cada una (la que se haya ido
+     * cerrando sola a medida que el grupo avanzaba etapa por etapa).
      */
     public void release(Dungeon dungeon) {
         dungeon.setInProgress(false);
         dungeon.getParticipants().clear();
         for (String stageName : dungeon.getStages()) {
             DungeonArea area = areaManager.getArea(stageName);
-            if (area != null) {
-                area.resetWindowState();
+            if (area == null) continue;
+            area.resetWindowState();
+            DoorDefinition entryDoor = area.getEntryDoor();
+            if (entryDoor != null) {
+                entryDoor.open();
             }
         }
-        openEntrance(dungeon);
     }
 }

@@ -38,6 +38,13 @@ public class DungeonArea {
     // Puertas físicas asociadas a esta área (id -> definición).
     private final Map<String, DoorDefinition> doors = new LinkedHashMap<>();
 
+    // Puerta "de entrada" y "de salida" de ESTA etapa (referencian un id
+    // dentro de `doors`, de esta misma área). La de entrada se cierra sola
+    // al arrancar el evento (cuando cierra la ventana de ingreso); la de
+    // salida la abrís vos manualmente desde el on-complete del objetivo.
+    private String entryDoorId;
+    private String exitDoorId;
+
     // Estado en vivo de la ventana. No se persiste en areas.yml: siempre
     // arranca "libre" cuando el plugin recarga o reinicia.
     private transient boolean windowOpen = false;
@@ -142,6 +149,30 @@ public class DungeonArea {
 
     public boolean removeDoor(String id) {
         return doors.remove(id.toLowerCase()) != null;
+    }
+
+    public String getEntryDoorId() {
+        return entryDoorId;
+    }
+
+    public void setEntryDoorId(String entryDoorId) {
+        this.entryDoorId = entryDoorId;
+    }
+
+    public String getExitDoorId() {
+        return exitDoorId;
+    }
+
+    public void setExitDoorId(String exitDoorId) {
+        this.exitDoorId = exitDoorId;
+    }
+
+    public DoorDefinition getEntryDoor() {
+        return entryDoorId == null ? null : getDoor(entryDoorId);
+    }
+
+    public DoorDefinition getExitDoor() {
+        return exitDoorId == null ? null : getDoor(exitDoorId);
     }
 
     public boolean isWindowOpen() {

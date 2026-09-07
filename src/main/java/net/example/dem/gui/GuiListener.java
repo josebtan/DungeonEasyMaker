@@ -1,5 +1,7 @@
 package net.example.dem.gui;
 
+import net.example.dem.gui.GuiHolders.MobEditorMenuHolder;
+import net.example.dem.gui.GuiHolders.MobEquipMenuHolder;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -7,6 +9,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.InventoryHolder;
 
 public class GuiListener implements Listener {
@@ -34,7 +37,7 @@ public class GuiListener implements Listener {
         if (clickedTop && guiManager.isFreeInteractSlot(holder, event.getSlot())) {
             return;
         }
-        if (!clickedTop && holder instanceof net.example.dem.gui.GuiHolders.MobEquipMenuHolder) {
+        if (!clickedTop && holder instanceof MobEquipMenuHolder) {
             return; // deja que el jugador maneje su propio inventario con normalidad
         }
 
@@ -52,10 +55,39 @@ public class GuiListener implements Listener {
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         InventoryHolder holder = event.getInventory().getHolder();
-        if (holder instanceof net.example.dem.gui.GuiHolders.MobEquipMenuHolder
-                && event.getPlayer() instanceof Player player) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+
+        if (holder instanceof MobEquipMenuHolder) {
             guiManager.returnEquipItemsOnClose(player, event.getInventory());
         }
+
+        // Si se cierra el editor o el submenú de equipamiento de un mob,
+        // esperamos 1 tick (por si es solo una navegación interna, que
+        // reabre otra pantalla de inmediato) y recién ahí decidimos si de
+        // verdad salió del "modo edición" de ese mob para borrar el marcador.
+        String areaName = null;
+        String mobId = null;
+        if (holder instanceof MobEditorMenuHolder h) {
+            areaName = h.getAreaName();
+            mobId = h.getMobId();
+        } else if (holder instanceof MobEquipMenuHolder h) {
+            areaName = h.getAreaName();
+            mobId = h.getMobId();
+        }
+
+        if (areaName != null) {
+            String finalArea = areaName;
+            String finalMobId = mobId;
+            Bukkit.getScheduler().runTask(guiManager.getPlugin(),
+                    () -> guiManager.clearEditMarkerIfLeftMob(player, finalArea, finalMobId));
+        }
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        guiManager.clearEditMarker(event.getPlayer());
     }
 
     @EventHandler

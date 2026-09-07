@@ -32,8 +32,6 @@ public class DungeonModule {
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "create":
                 return handleCreate(sender, args);
-            case "setentrance":
-                return handleSetEntrance(sender, args);
             case "setkickpoint":
                 return handleSetKickPoint(sender, args);
             case "complete":
@@ -70,23 +68,8 @@ public class DungeonModule {
         sender.sendMessage(ChatColor.GREEN + "Dungeon '" + id + "' creado con " + dungeon.getStages().size()
                 + " etapa(s): " + String.join(" -> ", dungeon.getStages()));
         sender.sendMessage(ChatColor.GRAY + "La primera etapa (" + dungeon.getStages().get(0)
-                + ") es la entrada. Configurale la puerta con /dem dungeon setentrance.");
-        return true;
-    }
-
-    private boolean handleSetEntrance(CommandSender sender, String[] args) {
-        if (args.length < 4) {
-            sender.sendMessage(ChatColor.RED + "Uso: /dem dungeon setentrance <id> <área> <idPuerta>");
-            return true;
-        }
-        Dungeon dungeon = resolveDungeon(sender, args[1]);
-        if (dungeon == null) return true;
-
-        dungeon.setEntranceDoorArea(args[2]);
-        dungeon.setEntranceDoorId(args[3]);
-        dungeonManager.save();
-        sender.sendMessage(ChatColor.GREEN + "Puerta de entrada de '" + dungeon.getId() + "' establecida en "
-                + args[2] + "/" + args[3] + ". Se va a cerrar sola al arrancar la corrida.");
+                + ") es la entrada: asignale su puerta con /dem area setentrydoor " + dungeon.getStages().get(0)
+                + " <idPuerta> y se va a cerrar sola al arrancar.");
         return true;
     }
 
@@ -160,8 +143,6 @@ public class DungeonModule {
 
         sender.sendMessage(ChatColor.AQUA + "=== Dungeon '" + dungeon.getId() + "' ===");
         sender.sendMessage(ChatColor.GRAY + "Etapas: " + String.join(" -> ", dungeon.getStages()));
-        sender.sendMessage(ChatColor.GRAY + "Entrada: " + (dungeon.getEntranceDoorArea() == null ? "(sin configurar)"
-                : dungeon.getEntranceDoorArea() + "/" + dungeon.getEntranceDoorId()));
         sender.sendMessage(ChatColor.GRAY + "Punto de expulsión: " + (dungeon.hasKickPoint() ? "configurado" : "(sin configurar)"));
         sender.sendMessage(ChatColor.GRAY + "Estado: " + (dungeon.isInProgress()
                 ? ChatColor.RED + "en curso (" + dungeon.getParticipants().size() + " participante(s))"
@@ -180,7 +161,7 @@ public class DungeonModule {
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(ChatColor.RED + "Uso: /dem dungeon <accion> ...");
         sender.sendMessage(ChatColor.GRAY + "create <id> <etapa1> <etapa2> ... <etapaN>");
-        sender.sendMessage(ChatColor.GRAY + "setentrance <id> <área> <idPuerta>");
+        sender.sendMessage(ChatColor.GRAY + "(la puerta de entrada se configura en la 1ra etapa con /dem area setentrydoor)");
         sender.sendMessage(ChatColor.GRAY + "setkickpoint <id>  (usa tu posición actual)");
         sender.sendMessage(ChatColor.GRAY + "complete|release <id>");
         sender.sendMessage(ChatColor.GRAY + "remove|list|info <id>");

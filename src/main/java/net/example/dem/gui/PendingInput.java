@@ -14,6 +14,7 @@ public class PendingInput {
         CREATE_AREA,
         ADD_COMMAND,
         CREATE_MOB,
+        CLONE_MOB,
         SET_MOB_NAME,
         SET_MOB_TAG,
         SET_MOB_LOOT,
@@ -48,6 +49,11 @@ public class PendingInput {
 
     public static PendingInput mobField(Kind kind, String areaName, String mobId) {
         return new PendingInput(kind, areaName, null, mobId, null);
+    }
+
+    /** El "mobId" acá es el mob ORIGEN que se está clonando, no uno existente a editar. */
+    public static PendingInput cloneMob(String areaName, String sourceMobId) {
+        return new PendingInput(Kind.CLONE_MOB, areaName, null, sourceMobId, null);
     }
 
     public Kind getKind() {

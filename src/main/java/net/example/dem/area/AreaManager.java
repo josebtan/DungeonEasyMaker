@@ -56,6 +56,8 @@ public class AreaManager {
             area.getStartCommands().addAll(s.getStringList("start-commands"));
             loadMobs(s, area);
             loadDoors(s, area);
+            area.setEntryDoorId(s.getString("entry-door-id", null));
+            area.setExitDoorId(s.getString("exit-door-id", null));
             areas.put(name.toLowerCase(), area);
         }
     }
@@ -203,6 +205,8 @@ public class AreaManager {
             config.set(base + ".start-commands", area.getStartCommands());
             saveMobs(config, base, area);
             saveDoors(config, base, area);
+            config.set(base + ".entry-door-id", area.getEntryDoorId());
+            config.set(base + ".exit-door-id", area.getExitDoorId());
         }
 
         try {

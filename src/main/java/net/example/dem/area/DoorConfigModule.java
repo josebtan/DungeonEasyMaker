@@ -45,6 +45,14 @@ public class DoorConfigModule {
                     door.close();
                     return "Puerta '" + door.getId() + "' cerrada.";
                 });
+            case "openentry":
+                return withRoleDoor(sender, args, true, true);
+            case "closeentry":
+                return withRoleDoor(sender, args, true, false);
+            case "openexit":
+                return withRoleDoor(sender, args, false, true);
+            case "closeexit":
+                return withRoleDoor(sender, args, false, false);
             case "remove":
                 return handleRemove(sender, args);
             case "list":
@@ -186,6 +194,36 @@ public class DoorConfigModule {
         return true;
     }
 
+    /**
+     * open/closeentry y open/closeexit: /dem area door <accion> <área> — usa
+     * la puerta que esa área tiene asignada como entrada o salida
+     * (/dem area setentrydoor / setexitdoor), sin tener que acordarse el id.
+     */
+    private boolean withRoleDoor(CommandSender sender, String[] args, boolean entry, boolean open) {
+        if (args.length < 2) {
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area door " + args[0] + " <área>");
+            return true;
+        }
+        DungeonArea area = resolveArea(sender, args[1]);
+        if (area == null) return true;
+
+        DoorDefinition door = entry ? area.getEntryDoor() : area.getExitDoor();
+        if (door == null) {
+            sender.sendMessage(ChatColor.RED + "'" + area.getName() + "' no tiene puerta de "
+                    + (entry ? "entrada" : "salida") + " configurada (/dem area set"
+                    + (entry ? "entry" : "exit") + "door).");
+            return true;
+        }
+        if (open) {
+            door.open();
+        } else {
+            door.close();
+        }
+        sender.sendMessage(ChatColor.GREEN + "Puerta de " + (entry ? "entrada" : "salida") + " de '"
+                + area.getName() + "' (" + door.getId() + ") " + (open ? "abierta." : "cerrada."));
+        return true;
+    }
+
     private DungeonArea resolveArea(CommandSender sender, String name) {
         DungeonArea area = areaManager.getArea(name);
         if (area == null) {
@@ -198,6 +236,7 @@ public class DoorConfigModule {
         sender.sendMessage(ChatColor.RED + "Uso: /dem area door <accion> <área> [id]");
         sender.sendMessage(ChatColor.GRAY + "create <área> <id>  (marcá 2 esquinas con la varita antes; captura lo ya construido)");
         sender.sendMessage(ChatColor.GRAY + "open|close <área> <id>");
+        sender.sendMessage(ChatColor.GRAY + "openentry|closeentry|openexit|closeexit <área>  (usa la puerta asignada con setentrydoor/setexitdoor)");
         sender.sendMessage(ChatColor.GRAY + "remove|list|info <área> [id]");
     }
 }

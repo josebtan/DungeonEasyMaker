@@ -278,4 +278,34 @@ public class MobSpawnDefinition {
     public List<UUID> getLiveEntities() {
         return liveEntities;
     }
+
+    /** Clona todos los atributos (menos el id) en un mob nuevo. La posición se copia también. */
+    public MobSpawnDefinition copyWithNewId(String newId) {
+        MobSpawnDefinition copy = new MobSpawnDefinition(newId, this.baseType);
+        copy.displayName = this.displayName;
+        copy.health = this.health;
+        copy.scale = this.scale;
+        copy.speed = this.speed;
+        copy.delaySeconds = this.delaySeconds;
+        copy.amount = this.amount;
+        copy.world = this.world;
+        copy.x = this.x;
+        copy.y = this.y;
+        copy.z = this.z;
+        copy.yaw = this.yaw;
+        copy.pitch = this.pitch;
+        for (Map.Entry<EquipmentSlot, ItemStack> entry : this.equipment.entrySet()) {
+            copy.equipment.put(entry.getKey(), entry.getValue().clone());
+        }
+        copy.dropOnDeath.putAll(this.dropOnDeath);
+        copy.potionEffects.addAll(this.potionEffects);
+        copy.noAi = this.noAi;
+        copy.silent = this.silent;
+        copy.invulnerable = this.invulnerable;
+        copy.glowing = this.glowing;
+        copy.baby = this.baby;
+        copy.tag = this.tag;
+        copy.lootTable = this.lootTable;
+        return copy;
+    }
 }

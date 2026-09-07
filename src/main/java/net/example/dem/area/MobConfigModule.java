@@ -156,11 +156,14 @@ public class MobConfigModule {
         }
 
         MobSpawnDefinition mob = new MobSpawnDefinition(id, type);
+        if (sender instanceof Player player) {
+            mob.setSpawnLocation(player.getLocation());
+        }
         area.addMob(mob);
         areaManager.save();
         sender.sendMessage(ChatColor.GREEN + "Mob '" + id + "' (" + type + ") creado en '" + area.getName()
-                + "'. Ahora usá /dem area mob setspawnhere " + area.getName() + " " + id
-                + " parado donde querés que aparezca.");
+                + "'" + (sender instanceof Player ? " con la posición donde estás parado." : ". Todavía sin posición "
+                + "(usá /dem area mob setspawnhere " + area.getName() + " " + id + " parado donde debe aparecer).")); 
         return true;
     }
 

@@ -100,6 +100,36 @@ Comportamiento automático que ya viene resuelto:
 - `/dem dungeon complete <id>` o `/dem dungeon release <id>` fuerzan la
   liberación manualmente si hace falta.
 
+## Puertas de entrada/salida por etapa
+
+Cada área puede tener su propia puerta de entrada y de salida asignadas:
+
+```
+/dem area setentrydoor etapa1 puerta_entrada
+/dem area setexitdoor etapa1 puerta_1_2
+```
+
+La de entrada se **cierra sola** al arrancar el evento de esa etapa (cuando
+cierra su ventana de ingreso). La de salida la abrís vos a mano desde el
+on-complete del objetivo:
+```
+/dem area door openexit etapa1
+```
+(o `/dem area door openentry|closeentry|closeexit <área>` para los otros casos).
+
+Ya no hace falta `/dem dungeon setentrance`: la entrada del dungeon completo
+es automáticamente la puerta de entrada de su primera etapa.
+
+## Editor de mobs: modo edición con armor stand
+
+Mientras tenés abierto el editor de un mob (o su submenú de equipamiento) en
+el GUI, aparece un armor stand en su posición mostrando nombre, cabeza y
+equipo actuales — una vista previa en vivo. Desaparece solo al salir del
+editor (volver a la lista, cerrar el inventario, o desconectarte).
+
+En la lista de mobs, **shift+click** sobre un mob existente lo clona (copia
+vida, escala, equipo, efectos, flags, posición) y solo pide un id nuevo.
+
 ## Mobs personalizados por área
 
 Cada área puede tener sus propios mobs configurados (tipo CMI, pero nativo de

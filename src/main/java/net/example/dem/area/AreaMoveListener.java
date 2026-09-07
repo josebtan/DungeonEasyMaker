@@ -14,6 +14,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -63,37 +64,63 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
         Set<String> currentlyInside = playersInside.computeIfAbsent(
                 player.getUniqueId(), k -> new HashSet<>());
 
+        List<DungeonArea> entered = new ArrayList<>();
+        List<DungeonArea> left = new ArrayList<>();
         for (DungeonArea area : areaManager.getAreas().values()) {
             boolean isInsideNow = area.contains(to);
             boolean wasInsideBefore = currentlyInside.contains(area.getName());
-
             if (isInsideNow && !wasInsideBefore) {
-                if (area.getJoinWindowSeconds() > 0 && area.isLocked()) {
-                    // La ventana ya cerró: no se puede entrar hasta que se libere.
-                    // Si "from" también está adentro (llegó por /tp u otro comando
-                    // en vez de caminar), no alcanza con cancelar el movimiento:
-                    // hay que expulsarlo a un punto seguro afuera.
-                    Location safeSpot = area.contains(from) ? resolveKickSpot(area, player) : from;
-                    event.setTo(safeSpot);
-                    player.sendMessage(ChatColor.RED + "'" + area.getName()
-                            + "' ya comenzó. Espera a que termine para poder entrar.");
-                    continue;
-                }
-
-                currentlyInside.add(area.getName());
-                runCommands(area.getEnterCommands(), player, to);
-
-                if (area.getJoinWindowSeconds() > 0) {
-                    handleWindowJoin(area, player);
-                }
+                entered.add(area);
             } else if (!isInsideNow && wasInsideBefore) {
-                currentlyInside.remove(area.getName());
-                runCommands(area.getLeaveCommands(), player, to);
-
-                if (area.getJoinWindowSeconds() > 0) {
-                    handleWindowLeave(area, player);
-                }
+                left.add(area);
             }
+        }
+
+        // IMPORTANTE: procesamos primero TODAS las entradas y recién después
+        // las salidas. Si alguien camina directo de una etapa a la siguiente
+        // en el mismo tick (ej: cruza la puerta de etapa1 a etapa2), así la
+        // etapa nueva ya queda registrada como ocupada ANTES de evaluar si el
+        // dungeon quedó vacío por la salida de la etapa vieja. Si lo
+        // hiciéramos en el orden inverso, un jugador que avanza de etapa se
+        // contaría como "salió del dungeon" por un instante y se liberaría
+        // (reabriendo la entrada y sin poder disparar los mobs de la próxima
+        // etapa) aunque en los hechos nunca dejó de estar adentro.
+        for (DungeonArea area : entered) {
+            handleAreaEnter(event, player, currentlyInside, area, from, to);
+        }
+        for (DungeonArea area : left) {
+            handleAreaLeave(player, currentlyInside, area, to);
+        }
+    }
+
+    private void handleAreaEnter(PlayerMoveEvent event, Player player, Set<String> currentlyInside,
+                                  DungeonArea area, Location from, Location to) {
+        if (area.getJoinWindowSeconds() > 0 && area.isLocked()) {
+            // La ventana ya cerró: no se puede entrar hasta que se libere.
+            // Si "from" también está adentro (llegó por /tp u otro comando en
+            // vez de caminar), no alcanza con cancelar el movimiento: hay que
+            // expulsarlo a un punto seguro afuera.
+            Location safeSpot = area.contains(from) ? resolveKickSpot(area, player) : from;
+            event.setTo(safeSpot);
+            player.sendMessage(ChatColor.RED + "'" + area.getName()
+                    + "' ya comenzó. Espera a que termine para poder entrar.");
+            return;
+        }
+
+        currentlyInside.add(area.getName());
+        runCommands(area.getEnterCommands(), player, to);
+
+        if (area.getJoinWindowSeconds() > 0) {
+            handleWindowJoin(area, player);
+        }
+    }
+
+    private void handleAreaLeave(Player player, Set<String> currentlyInside, DungeonArea area, Location to) {
+        currentlyInside.remove(area.getName());
+        runCommands(area.getLeaveCommands(), player, to);
+
+        if (area.getJoinWindowSeconds() > 0) {
+            handleWindowLeave(area, player);
         }
     }
 
@@ -193,8 +220,16 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
         // se disparan junto con los comandos de arranque.
         MobSpawner.spawnAllForArea(plugin, area);
 
+        // Cierra sola la puerta de entrada de ESTA etapa (si tiene una
+        // asignada con /dem area setentrydoor), para que nadie más pueda
+        // entrar a esta sala en particular una vez que arrancó el evento.
+        DoorDefinition entryDoor = area.getEntryDoor();
+        if (entryDoor != null) {
+            entryDoor.close();
+        }
+
         // Si esta área es la ENTRADA de un dungeon encadenado, arranca la
-        // corrida completa: marca participantes y cierra la puerta de entrada.
+        // corrida completa (marca participantes; la puerta ya se cerró arriba).
         Dungeon dungeon = dungeonManager.findDungeonByArea(area.getName());
         if (dungeon != null && dungeonManager.isEntranceStage(dungeon, area.getName())) {
             dungeonManager.startDungeon(dungeon, joiners);

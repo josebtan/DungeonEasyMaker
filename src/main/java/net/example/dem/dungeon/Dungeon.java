@@ -22,9 +22,6 @@ public class Dungeon {
     private final String id;
     private final List<String> stages = new ArrayList<>();
 
-    private String entranceDoorArea;
-    private String entranceDoorId;
-
     // Punto donde se manda a alguien que muere adentro, o que queda afuera
     // cuando se libera el dungeon.
     private String kickWorld;
@@ -48,22 +45,6 @@ public class Dungeon {
 
     public List<String> getStages() {
         return stages;
-    }
-
-    public String getEntranceDoorArea() {
-        return entranceDoorArea;
-    }
-
-    public void setEntranceDoorArea(String entranceDoorArea) {
-        this.entranceDoorArea = entranceDoorArea;
-    }
-
-    public String getEntranceDoorId() {
-        return entranceDoorId;
-    }
-
-    public void setEntranceDoorId(String entranceDoorId) {
-        this.entranceDoorId = entranceDoorId;
     }
 
     public boolean hasKickPoint() {

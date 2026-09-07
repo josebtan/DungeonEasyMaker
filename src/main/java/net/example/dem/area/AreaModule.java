@@ -63,6 +63,10 @@ public class AreaModule {
                 return mobConfigModule.handle(sender, Arrays.copyOfRange(args, 1, args.length));
             case "door":
                 return doorConfigModule.handle(sender, Arrays.copyOfRange(args, 1, args.length));
+            case "setentrydoor":
+                return handleSetRoleDoor(sender, args, true);
+            case "setexitdoor":
+                return handleSetRoleDoor(sender, args, false);
             case "remove":
                 return handleRemove(sender, args);
             case "list":
@@ -97,6 +101,8 @@ public class AreaModule {
         sender.sendMessage(ChatColor.RED + "/dem area mob <create|setname|sethealth|setscale|setspeed|setdelay|"
                 + "setamount|setspawnhere|addeffect|removeeffect|settag|setloot|setequip|toggle*|remove|list|info>");
         sender.sendMessage(ChatColor.RED + "/dem area door <create|open|close|remove|list|info>");
+        sender.sendMessage(ChatColor.RED + "/dem area setentrydoor <área> <idPuerta|clear>  (se cierra sola al arrancar)");
+        sender.sendMessage(ChatColor.RED + "/dem area setexitdoor <área> <idPuerta|clear>");
         sender.sendMessage(ChatColor.RED + "/dem area select <nombre>");
         sender.sendMessage(ChatColor.RED + "/dem area unselect");
         sender.sendMessage(ChatColor.RED + "/dem area here");
@@ -260,6 +266,46 @@ public class AreaModule {
         }
         String commandText = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
         addStartCommandToArea(sender, area, commandText);
+        return true;
+    }
+
+    /**
+     * /dem area setentrydoor <área> <idPuerta|clear>  — puerta que se cierra
+     * sola al arrancar el evento de esa etapa (cuando cierra su ventana).
+     * /dem area setexitdoor <área> <idPuerta|clear>   — la que abrís vos a
+     * mano desde el on-complete del objetivo para pasar a la siguiente etapa.
+     */
+    private boolean handleSetRoleDoor(CommandSender sender, String[] args, boolean entry) {
+        String actionName = entry ? "setentrydoor" : "setexitdoor";
+        if (args.length < 3) {
+            sender.sendMessage(ChatColor.RED + "Uso: /dem area " + actionName + " <área> <idPuerta|clear>");
+            return true;
+        }
+        DungeonArea area = areaManager.getArea(args[1]);
+        if (area == null) {
+            sender.sendMessage(ChatColor.RED + "No existe el área '" + args[1] + "'.");
+            return true;
+        }
+        String doorId = args[2].equalsIgnoreCase("clear") ? null : args[2];
+        if (doorId != null && area.getDoor(doorId) == null) {
+            sender.sendMessage(ChatColor.RED + "No existe la puerta '" + doorId + "' en '" + area.getName()
+                    + "' (creála primero con /dem area door create).");
+            return true;
+        }
+        if (entry) {
+            area.setEntryDoorId(doorId);
+        } else {
+            area.setExitDoorId(doorId);
+        }
+        areaManager.save();
+        if (doorId == null) {
+            sender.sendMessage(ChatColor.GREEN + "Puerta de " + (entry ? "entrada" : "salida") + " de '"
+                    + area.getName() + "' desasignada.");
+        } else {
+            sender.sendMessage(ChatColor.GREEN + "Puerta de " + (entry ? "entrada" : "salida") + " de '"
+                    + area.getName() + "' establecida en '" + doorId + "'"
+                    + (entry ? " (se va a cerrar sola al arrancar el evento)." : "."));
+        }
         return true;
     }
 
@@ -450,10 +496,12 @@ public class AreaModule {
         if (args.length == 1) {
             return filter(Arrays.asList("wand", "create", "addenter", "addleave", "addenterhere",
                     "addleavehere", "setwindow", "addstart", "addstarthere", "mob", "door",
+                    "setentrydoor", "setexitdoor",
                     "select", "unselect", "here", "show", "remove", "list", "info"), args[0]);
         }
         boolean needsAreaName = args.length == 2 && Arrays.asList(
-                "addenter", "addleave", "addstart", "setwindow", "remove", "info", "select", "show")
+                "addenter", "addleave", "addstart", "setwindow", "remove", "info", "select", "show",
+                "setentrydoor", "setexitdoor")
                 .contains(args[0].toLowerCase());
         if (needsAreaName) {
             return filter(new ArrayList<>(areaManager.getAreas().keySet()), args[1]);
