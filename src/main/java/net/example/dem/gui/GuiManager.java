@@ -96,6 +96,20 @@ public class GuiManager {
     // navegar fuera del editor de ese mob).
     private final Map<UUID, UUID> editMarkers = new HashMap<>();
 
+    // Confirmación de borrado en 2 clicks normales (sin shift, para que
+    // funcione también en Bedrock/Geyser, donde shift+click no llega bien).
+    private final Map<UUID, String> pendingConfirm = new HashMap<>();
+
+    /** true = ya era el 2do click, confirmado (y se borra el estado). false = recién se armó, falta confirmar. */
+    private boolean confirmOrArm(Player player, String key) {
+        if (key.equalsIgnoreCase(pendingConfirm.get(player.getUniqueId()))) {
+            pendingConfirm.remove(player.getUniqueId());
+            return true;
+        }
+        pendingConfirm.put(player.getUniqueId(), key);
+        return false;
+    }
+
     public GuiManager(Plugin plugin, AreaManager areaManager, SelectionListener selectionListener) {
         this.plugin = plugin;
         this.areaManager = areaManager;
@@ -156,6 +170,7 @@ public class GuiManager {
     // ----------------------------------------------------------------
 
     public void openMainMenu(Player player) {
+        pendingConfirm.remove(player.getUniqueId());
         Inventory inv = Bukkit.createInventory(new MainMenuHolder(), 54,
                 ChatColor.DARK_PURPLE + "DEM - Áreas");
         ((MainMenuHolder) inv.getHolder()).setInventory(inv);
@@ -264,8 +279,11 @@ public class GuiManager {
                 ChatColor.GOLD + "Ventana de ingreso: " + area.getJoinWindowSeconds() + "s",
                 buildWindowLore(area), "window", area.getName(), null));
 
-        inv.setItem(31, buildItem(Material.BARRIER, ChatColor.RED + "Eliminar área",
-                List.of(ChatColor.GRAY + "Shift + click para eliminar",
+        boolean deleteArmed = ("area:" + area.getName()).equalsIgnoreCase(pendingConfirm.get(player.getUniqueId()));
+        inv.setItem(31, buildItem(
+                deleteArmed ? Material.TNT : Material.BARRIER,
+                deleteArmed ? ChatColor.RED + "¿SEGURO? Click de nuevo" : ChatColor.RED + "Eliminar área",
+                List.of(ChatColor.GRAY + (deleteArmed ? "Este click SÍ borra el área" : "Click 2 veces para eliminar"),
                         ChatColor.GRAY + "(no se puede deshacer)"),
                 "delete", area.getName(), null));
 
@@ -372,6 +390,7 @@ public class GuiManager {
 
     public void openMobListMenu(Player player, String areaName) {
         clearEditMarker(player); // salir de la lista = salir del modo edición de cualquier mob
+        pendingConfirm.remove(player.getUniqueId());
         DungeonArea area = areaManager.getArea(areaName);
         if (area == null) {
             player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
@@ -668,8 +687,11 @@ public class GuiManager {
         inv.setItem(31, buildToggle(Material.GLOWSTONE_DUST, "Brillante", mob.isGlowing(), "toggle_glow", mob.getId()));
         inv.setItem(32, buildToggle(Material.EGG, "Bebé", mob.isBaby(), "toggle_baby", mob.getId()));
 
-        inv.setItem(49, buildItem(Material.BARRIER, ChatColor.RED + "Eliminar mob",
-                List.of(ChatColor.GRAY + "Shift + click para eliminar",
+        boolean deleteMobArmed = ("mob:" + area.getName() + ":" + mob.getId()).equalsIgnoreCase(pendingConfirm.get(player.getUniqueId()));
+        inv.setItem(49, buildItem(
+                deleteMobArmed ? Material.TNT : Material.BARRIER,
+                deleteMobArmed ? ChatColor.RED + "¿SEGURO? Click de nuevo" : ChatColor.RED + "Eliminar mob",
+                List.of(ChatColor.GRAY + (deleteMobArmed ? "Este click SÍ borra el mob" : "Click 2 veces para eliminar"),
                         ChatColor.GRAY + "(no se puede deshacer)"),
                 "delete_mob", null, null, mob.getId()));
         inv.setItem(45, buildItem(Material.ARROW, ChatColor.WHITE + "« Volver", List.of(), "back_mobs", area.getName(), null));
@@ -832,12 +854,14 @@ public class GuiManager {
                 openAreaMenu(player, areaName);
             }
             case "delete" -> {
-                if (event.isShiftClick()) {
+                if (confirmOrArm(player, "area:" + area.getName())) {
                     areaManager.removeArea(area.getName());
                     player.sendMessage(ChatColor.YELLOW + "Área '" + area.getName() + "' eliminada.");
                     openMainMenu(player);
                 } else {
-                    player.sendMessage(ChatColor.RED + "Mantené shift y hacé click para confirmar la eliminación.");
+                    player.sendMessage(ChatColor.RED + "Click de nuevo para confirmar: se va a eliminar '"
+                            + area.getName() + "'.");
+                    openAreaMenu(player, areaName);
                 }
             }
             default -> { }
@@ -1029,13 +1053,15 @@ public class GuiManager {
             case "toggle_glow" -> { mob.setGlowing(!mob.isGlowing()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
             case "toggle_baby" -> { mob.setBaby(!mob.isBaby()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
             case "delete_mob" -> {
-                if (shift) {
+                if (confirmOrArm(player, "mob:" + areaName + ":" + mob.getId())) {
                     area.removeMob(mob.getId());
                     areaManager.save();
                     player.sendMessage(ChatColor.YELLOW + "Mob '" + mob.getId() + "' eliminado.");
                     openMobListMenu(player, areaName);
                 } else {
-                    player.sendMessage(ChatColor.RED + "Mantené shift y hacé click para confirmar la eliminación.");
+                    player.sendMessage(ChatColor.RED + "Click de nuevo para confirmar: se va a eliminar '"
+                            + mob.getId() + "'.");
+                    openMobEditorMenu(player, areaName, mobId);
                 }
             }
             default -> { }
