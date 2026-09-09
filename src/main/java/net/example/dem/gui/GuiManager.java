@@ -88,13 +88,10 @@ public class GuiManager {
     private final NamespacedKey areaKey;
     private final NamespacedKey indexKey;
     private final NamespacedKey mobKey;
+    private final NamespacedKey markerAreaKey;
+    private final NamespacedKey markerMobKey;
 
     private final Map<UUID, PendingInput> pendingInputs = new HashMap<>();
-
-    // Armor stand "modo edición": jugador -> UUID de la entidad marcadora que
-    // está mostrando ahora mismo (uno solo por jugador, se reemplaza/borra al
-    // navegar fuera del editor de ese mob).
-    private final Map<UUID, UUID> editMarkers = new HashMap<>();
 
     // Confirmación de borrado en 2 clicks normales (sin shift, para que
     // funcione también en Bedrock/Geyser, donde shift+click no llega bien).
@@ -118,10 +115,20 @@ public class GuiManager {
         this.areaKey = new NamespacedKey(plugin, NAMESPACE + "_gui_area");
         this.indexKey = new NamespacedKey(plugin, NAMESPACE + "_gui_index");
         this.mobKey = new NamespacedKey(plugin, NAMESPACE + "_gui_mob");
+        this.markerAreaKey = new NamespacedKey(plugin, NAMESPACE + "_marker_area");
+        this.markerMobKey = new NamespacedKey(plugin, NAMESPACE + "_marker_mob");
     }
 
     public Plugin getPlugin() {
         return plugin;
+    }
+
+    public NamespacedKey getMarkerAreaKey() {
+        return markerAreaKey;
+    }
+
+    public NamespacedKey getMarkerMobKey() {
+        return markerMobKey;
     }
 
     public boolean isDemGui(InventoryHolder holder) {
@@ -237,6 +244,11 @@ public class GuiManager {
             return;
         }
 
+        // Entrar (o seguir) en modo edición: pone/asegura el armor stand
+        // marcador de cada mob y desactiva la ventana de ingreso mientras
+        // este menú (o cualquiera de sus submenús) esté en uso.
+        enterAreaEditMode(area);
+
         Inventory inv = Bukkit.createInventory(new AreaMenuHolder(area.getName()), 36,
                 ChatColor.DARK_PURPLE + "Área: " + area.getName());
         ((AreaMenuHolder) inv.getHolder()).setInventory(inv);
@@ -279,6 +291,21 @@ public class GuiManager {
                 ChatColor.GOLD + "Ventana de ingreso: " + area.getJoinWindowSeconds() + "s",
                 buildWindowLore(area), "window", area.getName(), null));
 
+        long taggedCount = area.getMobs().stream().filter(m -> area.getName().equalsIgnoreCase(m.getTag())).count();
+        inv.setItem(24, buildItem(Material.TARGET, ChatColor.GOLD + "Meta automática",
+                List.of(ChatColor.GRAY + "Mobs con etiqueta '" + area.getName() + "': " + taggedCount,
+                        ChatColor.GRAY + "Click agrega el objetivo (matarlos",
+                        ChatColor.GRAY + "a todos) a Comandos de arranque."),
+                "auto_goal", area.getName(), null));
+
+        inv.setItem(22, buildItem(Material.GLOWSTONE, ChatColor.YELLOW + "Modo edición: ACTIVO",
+                List.of(ChatColor.GRAY + "Mientras este menú (o sus submenús)",
+                        ChatColor.GRAY + "estén abiertos, esta área NO arranca",
+                        ChatColor.GRAY + "el evento aunque camines adentro.",
+                        ChatColor.GRAY + "Los mobs se ven como armor stands.",
+                        ChatColor.GRAY + "Salí con Guardar o Cancelar abajo."),
+                "noop", null, null));
+
         boolean deleteArmed = ("area:" + area.getName()).equalsIgnoreCase(pendingConfirm.get(player.getUniqueId()));
         inv.setItem(31, buildItem(
                 deleteArmed ? Material.TNT : Material.BARRIER,
@@ -287,7 +314,21 @@ public class GuiManager {
                         ChatColor.GRAY + "(no se puede deshacer)"),
                 "delete", area.getName(), null));
 
-        inv.setItem(27, buildItem(Material.ARROW, ChatColor.WHITE + "« Volver", List.of(), "back_main", null, null));
+        inv.setItem(27, buildItem(Material.ARROW, ChatColor.WHITE + "« Volver",
+                List.of(ChatColor.GRAY + "(seguís en modo edición,",
+                        ChatColor.GRAY + "los marcadores no se van)"),
+                "back_main", area.getName(), null));
+
+        inv.setItem(33, buildItem(Material.REDSTONE, ChatColor.GOLD + "Cancelar edición",
+                List.of(ChatColor.GRAY + "Saca los armor stands y sale.",
+                        ChatColor.GRAY + "(los cambios que ya hiciste",
+                        ChatColor.GRAY + "quedan guardados igual)"),
+                "cancel_edit", area.getName(), null));
+
+        inv.setItem(35, buildItem(Material.EMERALD_BLOCK, ChatColor.GREEN + "Guardar y salir",
+                List.of(ChatColor.GRAY + "Termina la edición: saca los",
+                        ChatColor.GRAY + "armor stands, el área queda lista"),
+                "save_edit", area.getName(), null));
 
         player.openInventory(inv);
     }
@@ -389,7 +430,6 @@ public class GuiManager {
     // ----------------------------------------------------------------
 
     public void openMobListMenu(Player player, String areaName) {
-        clearEditMarker(player); // salir de la lista = salir del modo edición de cualquier mob
         pendingConfirm.remove(player.getUniqueId());
         DungeonArea area = areaManager.getArea(areaName);
         if (area == null) {
@@ -478,7 +518,7 @@ public class GuiManager {
                 : ChatColor.RED + "Sin posición (usá 'Fijar posición aquí')");
         lore.add("");
         lore.add(ChatColor.YELLOW + "Click para editar");
-        lore.add(ChatColor.YELLOW + "Shift+click para clonar");
+        lore.add(ChatColor.YELLOW + "Click derecho para clonar");
         String display = mob.getDisplayName() != null ? mob.getDisplayName() : mob.getId();
         return buildItem(entityIcon(mob.getBaseType()), ChatColor.GOLD + display, lore,
                 "open_mob", null, null, mob.getId());
@@ -504,7 +544,8 @@ public class GuiManager {
     }
 
     // ----------------------------------------------------------------
-    // Armor stand "modo edición" — marcador visual mientras editás un mob
+    // Armor stands "modo edición" — uno por CADA mob del área, visibles
+    // mientras el área esté en modo edición (hasta Guardar/Cancelar).
     // ----------------------------------------------------------------
 
     /** Cabeza real (no huevo) para el marcador, cuando existe una para ese tipo. */
@@ -521,17 +562,68 @@ public class GuiManager {
         };
     }
 
-    /**
-     * Crea (reemplazando cualquier anterior) un armor stand en la posición
-     * del mob, con su cabeza y equipamiento actuales puestos, y un cartel con
-     * el id. Sirve de vista previa mientras estás en el editor. Si el mob
-     * todavía no tiene posición configurada, no hay dónde ponerlo.
-     */
-    private void refreshEditMarker(Player player, MobSpawnDefinition mob) {
-        clearEditMarker(player);
+    private void applyMarkerLook(ArmorStand as, MobSpawnDefinition mob) {
+        as.setCustomName(ChatColor.YELLOW + "[" + mob.getId() + "] "
+                + ChatColor.WHITE + (mob.getDisplayName() != null ? mob.getDisplayName() : mob.getBaseType().name()));
+        as.setCustomNameVisible(true);
+
+        EntityEquipment equipment = as.getEquipment();
+        if (equipment == null) return;
+        ItemStack head = mob.getEquipment().get(EquipmentSlot.HEAD);
+        if (head != null) {
+            equipment.setHelmet(head.clone());
+        } else {
+            Material fallback = markerHeadFor(mob.getBaseType());
+            if (fallback == null) fallback = entityIcon(mob.getBaseType());
+            if (fallback.isItem()) equipment.setHelmet(new ItemStack(fallback));
+        }
+        ItemStack chest = mob.getEquipment().get(EquipmentSlot.CHEST);
+        equipment.setChestplate(chest != null ? chest.clone() : null);
+        ItemStack legs = mob.getEquipment().get(EquipmentSlot.LEGS);
+        equipment.setLeggings(legs != null ? legs.clone() : null);
+        ItemStack feet = mob.getEquipment().get(EquipmentSlot.FEET);
+        equipment.setBoots(feet != null ? feet.clone() : null);
+        ItemStack hand = mob.getEquipment().get(EquipmentSlot.HAND);
+        equipment.setItemInMainHand(hand != null ? hand.clone() : null);
+        ItemStack offhand = mob.getEquipment().get(EquipmentSlot.OFF_HAND);
+        equipment.setItemInOffHand(offhand != null ? offhand.clone() : null);
+    }
+
+    /** Entra en modo edición (si no lo estaba ya) y asegura un marcador por cada mob existente. */
+    public void enterAreaEditMode(DungeonArea area) {
+        area.setEditMode(true);
+        for (MobSpawnDefinition mob : area.getMobs()) {
+            ensureMarker(area, mob);
+        }
+    }
+
+    /** Sale del modo edición: borra TODOS los armor stands marcadores del área. */
+    public void exitAreaEditMode(DungeonArea area) {
+        for (UUID id : new ArrayList<>(area.getMarkerEntities().values())) {
+            Entity entity = Bukkit.getEntity(id);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        area.getMarkerEntities().clear();
+        area.setEditMode(false);
+    }
+
+    /** Si el mob no tiene marcador vivo todavía, le crea uno. No toca los que ya existen. */
+    private void ensureMarker(DungeonArea area, MobSpawnDefinition mob) {
+        UUID existing = area.getMarkerEntities().get(mob.getId());
+        if (existing != null && Bukkit.getEntity(existing) != null) {
+            return;
+        }
+        spawnOrRefreshMarker(area, mob);
+    }
+
+    /** Crea (reemplazando cualquier anterior) el armor stand marcador de este mob puntual. */
+    public void spawnOrRefreshMarker(DungeonArea area, MobSpawnDefinition mob) {
+        removeMarker(area, mob.getId());
         Location loc = mob.getSpawnLocation();
         if (loc == null) {
-            return;
+            return; // sin posición todavía, no hay dónde ponerlo
         }
         ArmorStand stand = loc.getWorld().spawn(loc.clone().add(0, 0.05, 0), ArmorStand.class, as -> {
             as.setInvulnerable(true);
@@ -539,60 +631,46 @@ public class GuiManager {
             as.setBasePlate(false);
             as.setCollidable(false);
             as.setPersistent(false);
-            as.setCustomName(ChatColor.YELLOW + "[Editando] " + ChatColor.WHITE + mob.getId());
-            as.setCustomNameVisible(true);
-
-            EntityEquipment equipment = as.getEquipment();
-            if (equipment != null) {
-                ItemStack head = mob.getEquipment().get(EquipmentSlot.HEAD);
-                if (head != null) {
-                    equipment.setHelmet(head.clone());
-                } else {
-                    Material fallback = markerHeadFor(mob.getBaseType());
-                    if (fallback == null) fallback = entityIcon(mob.getBaseType());
-                    if (fallback.isItem()) equipment.setHelmet(new ItemStack(fallback));
-                }
-                ItemStack chest = mob.getEquipment().get(EquipmentSlot.CHEST);
-                if (chest != null) equipment.setChestplate(chest.clone());
-                ItemStack legs = mob.getEquipment().get(EquipmentSlot.LEGS);
-                if (legs != null) equipment.setLeggings(legs.clone());
-                ItemStack feet = mob.getEquipment().get(EquipmentSlot.FEET);
-                if (feet != null) equipment.setBoots(feet.clone());
-                ItemStack hand = mob.getEquipment().get(EquipmentSlot.HAND);
-                if (hand != null) equipment.setItemInMainHand(hand.clone());
-                ItemStack offhand = mob.getEquipment().get(EquipmentSlot.OFF_HAND);
-                if (offhand != null) equipment.setItemInOffHand(offhand.clone());
-            }
+            as.getPersistentDataContainer().set(markerAreaKey, PersistentDataType.STRING, area.getName());
+            as.getPersistentDataContainer().set(markerMobKey, PersistentDataType.STRING, mob.getId());
+            applyMarkerLook(as, mob);
         });
-        editMarkers.put(player.getUniqueId(), stand.getUniqueId());
+        area.getMarkerEntities().put(mob.getId(), stand.getUniqueId());
     }
 
-    /** Saca el armor stand marcador de este jugador, si tiene uno activo. */
-    public void clearEditMarker(Player player) {
-        UUID standId = editMarkers.remove(player.getUniqueId());
-        if (standId != null) {
-            Entity entity = Bukkit.getEntity(standId);
+    public void removeMarker(DungeonArea area, String mobId) {
+        UUID id = area.getMarkerEntities().remove(mobId);
+        if (id != null) {
+            Entity entity = Bukkit.getEntity(id);
             if (entity != null) {
                 entity.remove();
             }
         }
     }
 
-    /**
-     * Llamado (con 1 tick de delay) después de cerrar el editor o el
-     * submenú de equipamiento: si el jugador no siguió mirando el MISMO mob
-     * (ni en el editor ni en equipamiento), se considera que salió del modo
-     * edición y se borra el marcador.
-     */
-    public void clearEditMarkerIfLeftMob(Player player, String areaName, String mobId) {
-        InventoryHolder current = player.getOpenInventory().getTopInventory().getHolder();
-        boolean stillEditingSameMob =
-                (current instanceof MobEditorMenuHolder h && h.getAreaName().equalsIgnoreCase(areaName)
-                        && h.getMobId().equalsIgnoreCase(mobId))
-                || (current instanceof MobEquipMenuHolder h2 && h2.getAreaName().equalsIgnoreCase(areaName)
-                        && h2.getMobId().equalsIgnoreCase(mobId));
-        if (!stillEditingSameMob) {
-            clearEditMarker(player);
+    /** Relee el equipo actual del armor stand y lo guarda en la definición del mob (usado al clickearlo con un ítem). */
+    public void syncMarkerEquipmentFromStand(String areaName, String mobId, ArmorStand stand) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) return;
+        MobSpawnDefinition mob = area.getMob(mobId);
+        if (mob == null) return;
+
+        EntityEquipment equipment = stand.getEquipment();
+        if (equipment == null) return;
+        putOrRemove(mob, EquipmentSlot.HEAD, equipment.getHelmet());
+        putOrRemove(mob, EquipmentSlot.CHEST, equipment.getChestplate());
+        putOrRemove(mob, EquipmentSlot.LEGS, equipment.getLeggings());
+        putOrRemove(mob, EquipmentSlot.FEET, equipment.getBoots());
+        putOrRemove(mob, EquipmentSlot.HAND, equipment.getItemInMainHand());
+        putOrRemove(mob, EquipmentSlot.OFF_HAND, equipment.getItemInOffHand());
+        areaManager.save();
+    }
+
+    private void putOrRemove(MobSpawnDefinition mob, EquipmentSlot slot, ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            mob.getEquipment().remove(slot);
+        } else {
+            mob.getEquipment().put(slot, item.clone());
         }
     }
 
@@ -610,9 +688,10 @@ public class GuiManager {
             return;
         }
 
-        // Entramos (o seguimos) en "modo edición" de este mob: muestra/actualiza
-        // el armor stand marcador en su posición mientras dure la edición.
-        refreshEditMarker(player, mob);
+        // El área ya está en modo edición desde que se abrió su menú: esto
+        // solo asegura que el marcador de este mob puntual esté actualizado
+        // (por si se le cambió posición, nombre o equipo recién).
+        spawnOrRefreshMarker(area, mob);
 
         Inventory inv = Bukkit.createInventory(new MobEditorMenuHolder(area.getName(), mob.getId()), 54,
                 ChatColor.DARK_PURPLE + "Mob: " + mob.getId());
@@ -853,8 +932,25 @@ public class GuiManager {
                 areaManager.save();
                 openAreaMenu(player, areaName);
             }
+            case "auto_goal" -> {
+                long count = area.getMobs().stream().filter(m -> area.getName().equalsIgnoreCase(m.getTag())).count();
+                if (count == 0) {
+                    player.sendMessage(ChatColor.RED + "Ningún mob tiene la etiqueta '" + area.getName()
+                            + "' todavía (se pone sola al crearlos desde este menú).");
+                } else {
+                    String cmd = "dem objective watch " + area.getName() + " " + count
+                            + " broadcast &a¡" + area.getName() + " superada!";
+                    area.getStartCommands().add(cmd);
+                    areaManager.save();
+                    player.sendMessage(ChatColor.GREEN + "Agregado a Comandos de arranque: " + cmd);
+                    player.sendMessage(ChatColor.GRAY + "Editalo ahí (Comandos de arranque) si querés sumarle "
+                            + "abrir una puerta u otro efecto al completarse.");
+                }
+                openAreaMenu(player, areaName);
+            }
             case "delete" -> {
                 if (confirmOrArm(player, "area:" + area.getName())) {
+                    exitAreaEditMode(area);
                     areaManager.removeArea(area.getName());
                     player.sendMessage(ChatColor.YELLOW + "Área '" + area.getName() + "' eliminada.");
                     openMainMenu(player);
@@ -863,6 +959,17 @@ public class GuiManager {
                             + area.getName() + "'.");
                     openAreaMenu(player, areaName);
                 }
+            }
+            case "save_edit" -> {
+                exitAreaEditMode(area);
+                player.sendMessage(ChatColor.GREEN + "'" + area.getName() + "' guardada. Modo edición desactivado.");
+                openMainMenu(player);
+            }
+            case "cancel_edit" -> {
+                exitAreaEditMode(area);
+                player.sendMessage(ChatColor.YELLOW + "Modo edición de '" + area.getName()
+                        + "' cancelado (los cambios que ya hiciste quedan aplicados).");
+                openMainMenu(player);
             }
             default -> { }
         }
@@ -909,11 +1016,11 @@ public class GuiManager {
         switch (action) {
             case "back_area" -> openAreaMenu(player, areaName);
             case "open_mob" -> {
-                if (event.isShiftClick()) {
+                if (event.isRightClick()) {
                     pendingInputs.put(player.getUniqueId(), PendingInput.cloneMob(areaName, mobId));
                     player.closeInventory();
-                    player.sendMessage(ChatColor.GREEN + "Escribí el id para la copia de '" + mobId
-                            + "' en el chat, o 'cancelar'.");
+                    player.sendMessage(ChatColor.GREEN + "Parate en la posición donde va la copia y escribí "
+                            + "el id para '" + mobId + "' en el chat, o 'cancelar'.");
                 } else {
                     openMobEditorMenu(player, areaName, mobId);
                 }
@@ -942,13 +1049,37 @@ public class GuiManager {
                     player.sendMessage(ChatColor.RED + "Tipo inválido, probá de nuevo.");
                     return;
                 }
-                pendingInputs.put(player.getUniqueId(), PendingInput.createMob(areaName, type));
-                player.closeInventory();
-                player.sendMessage(ChatColor.GREEN + "Elegiste " + prettyName(type) + ". Ahora escribí en el chat "
-                        + "el id para este mob (ej: guardia1), o 'cancelar'.");
+                createMobInstant(player, area, type);
             }
             default -> { }
         }
+    }
+
+    private String nextMobId(DungeonArea area) {
+        int i = 1;
+        while (area.getMob("mob" + i) != null) {
+            i++;
+        }
+        return "mob" + i;
+    }
+
+    /**
+     * Crea el mob al toque: sin pedir nada por chat. Usa la posición ACTUAL
+     * del jugador como spawn point y un id autogenerado (después se le puede
+     * poner un nombre lindo con el botón "Nombre" del editor). Abre el
+     * editor directo, con su armor stand ya puesto.
+     */
+    private void createMobInstant(Player player, DungeonArea area, EntityType type) {
+        String id = nextMobId(area);
+        MobSpawnDefinition mob = new MobSpawnDefinition(id, type);
+        mob.setSpawnLocation(player.getLocation());
+        mob.setTag(area.getName()); // etiqueta = nombre del área, para automatizar el objetivo
+        area.addMob(mob);
+        areaManager.save();
+        spawnOrRefreshMarker(area, mob);
+        player.sendMessage(ChatColor.GREEN + "Mob '" + id + "' (" + prettyName(type)
+                + ") creado en tu posición actual, con etiqueta '" + area.getName() + "'.");
+        openMobEditorMenu(player, area.getName(), id);
     }
 
     private void handleMobEditorAction(Player player, String areaName, String mobId, String action, InventoryClickEvent event) {
@@ -1054,6 +1185,7 @@ public class GuiManager {
             case "toggle_baby" -> { mob.setBaby(!mob.isBaby()); areaManager.save(); openMobEditorMenu(player, areaName, mobId); }
             case "delete_mob" -> {
                 if (confirmOrArm(player, "mob:" + areaName + ":" + mob.getId())) {
+                    removeMarker(area, mob.getId());
                     area.removeMob(mob.getId());
                     areaManager.save();
                     player.sendMessage(ChatColor.YELLOW + "Mob '" + mob.getId() + "' eliminado.");
@@ -1209,10 +1341,12 @@ public class GuiManager {
         }
 
         MobSpawnDefinition clone = source.copyWithNewId(id);
+        clone.setSpawnLocation(player.getLocation()); // se clona parado en la posición nueva
         area.addMob(clone);
         areaManager.save();
+        spawnOrRefreshMarker(area, clone);
         player.sendMessage(ChatColor.GREEN + "Mob '" + id + "' creado como copia de '" + sourceMobId
-                + "' (mismo equipo, vida, efectos y posición; movela con 'Fijar posición aquí' si hace falta).");
+                + "' (mismo equipo, vida y efectos) en tu posición actual.");
         openMobEditorMenu(player, areaName, id);
     }
 

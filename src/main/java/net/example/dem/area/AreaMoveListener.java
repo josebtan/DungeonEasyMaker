@@ -95,6 +95,14 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
 
     private void handleAreaEnter(PlayerMoveEvent event, Player player, Set<String> currentlyInside,
                                   DungeonArea area, Location from, Location to) {
+        if (area.isEditMode()) {
+            // En modo edición (GUI) no se dispara nada del evento: alguien
+            // puede caminar adentro para probar posiciones sin arrancar la
+            // ventana de ingreso ni bloquear el área.
+            currentlyInside.add(area.getName());
+            return;
+        }
+
         if (area.getJoinWindowSeconds() > 0 && area.isLocked()) {
             // La ventana ya cerró: no se puede entrar hasta que se libere.
             // Si "from" también está adentro (llegó por /tp u otro comando en
@@ -117,6 +125,9 @@ public class AreaMoveListener implements org.bukkit.event.Listener {
 
     private void handleAreaLeave(Player player, Set<String> currentlyInside, DungeonArea area, Location to) {
         currentlyInside.remove(area.getName());
+        if (area.isEditMode()) {
+            return; // idem: en modo edición no corren leave-commands ni se toca la ventana
+        }
         runCommands(area.getLeaveCommands(), player, to);
 
         if (area.getJoinWindowSeconds() > 0) {

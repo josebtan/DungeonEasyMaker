@@ -9,6 +9,7 @@ import net.example.dem.dungeon.DungeonManager;
 import net.example.dem.dungeon.DungeonModule;
 import net.example.dem.gui.GuiListener;
 import net.example.dem.gui.GuiManager;
+import net.example.dem.gui.MobMarkerListener;
 import net.example.dem.loot.LootManager;
 import net.example.dem.loot.LootModule;
 import net.example.dem.mob.MobDeathListener;
@@ -57,6 +58,7 @@ public class DEMPlugin extends JavaPlugin {
         // --- GUI de configuración (inventario) ---
         GuiManager guiManager = new GuiManager(this, areaManager, selectionListener);
         getServer().getPluginManager().registerEvents(new GuiListener(guiManager), this);
+        getServer().getPluginManager().registerEvents(new MobMarkerListener(guiManager), this);
 
         // --- Comando único: /dem area|objective|loot|dungeon|gui|reload ---
         DEMCommand demCommand = new DEMCommand(areaManager, lootManager, areaModule, objectiveModule,

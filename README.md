@@ -122,13 +122,42 @@ es automáticamente la puerta de entrada de su primera etapa.
 
 ## Editor de mobs: modo edición con armor stand
 
-Mientras tenés abierto el editor de un mob (o su submenú de equipamiento) en
-el GUI, aparece un armor stand en su posición mostrando nombre, cabeza y
-equipo actuales — una vista previa en vivo. Desaparece solo al salir del
-editor (volver a la lista, cerrar el inventario, o desconectarte).
+Al abrir el menú de un área (`/dem gui` → elegí el área) entrás en **modo
+edición**: mientras ese menú (o cualquiera de sus submenús) esté abierto...
 
-En la lista de mobs, **shift+click** sobre un mob existente lo clona (copia
-vida, escala, equipo, efectos, flags, posición) y solo pide un id nuevo.
+- La ventana de ingreso NO se dispara: podés caminar adentro para probar
+  posiciones sin arrancar el evento ni bloquear el área.
+- Aparece un **armor stand por cada mob** de esa área, mostrando su nombre,
+  cabeza y equipo actual — todos visibles a la vez, no solo el que estás
+  tocando en ese momento.
+- Los armor stands quedan puestos hasta que apretás **Guardar** o
+  **Cancelar** en el menú del área (el botón "« Volver" solo navega, no
+  cierra el modo edición).
+
+**Crear un mob** ahora es un solo paso: Mobs → Crear mob nuevo → elegís el
+tipo (huevo de spawn) → se crea al toque, en la posición donde estás parado,
+con un id automático (`mob1`, `mob2`...) y **etiqueta = nombre del área**
+(para que el objetivo se arme solo). Se abre su editor directo.
+
+**Clonar un mob**: en la lista, **click derecho** sobre uno existente (no
+shift, para que funcione en Bedrock/Geyser) → pedí el id nuevo por chat,
+parado en la posición donde va la copia.
+
+**Click físico en el armor stand**: además de desde el GUI, podés
+click-derecho el armor stand en el mundo para abrir el editor de ese mob. Si
+tenés un arma o armadura en la mano al hacerlo, se la equipa (comportamiento
+normal de armor stand) y eso se guarda en la definición del mob. Click
+izquierdo (golpe) no hace nada, no le pega ni lo empuja.
+
+**Meta automática**: en el menú del área, el botón "Meta automática" cuenta
+cuántos mobs tienen la etiqueta = nombre del área y agrega solo
+`dem objective watch <área> <cantidad> broadcast ...` a Comandos de arranque
+(editalo ahí si querés sumarle abrir una puerta u otro efecto al completarse).
+
+> **Nota sobre "Cancelar":** los cambios de cada botón se guardan al toque
+> (para no perder nada si el server se cae a mitad de edición). "Cancelar"
+> saca los armor stands y sale del modo edición, pero no deshace ediciones
+> que ya hiciste — solo "Eliminar mob"/"Eliminar área" borran algo de verdad.
 
 ## Mobs personalizados por área
 

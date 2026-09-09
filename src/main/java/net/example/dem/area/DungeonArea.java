@@ -8,6 +8,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,6 +56,14 @@ public class DungeonArea {
     // Entidades actualmente spawneadas por los mobs de esta área (de
     // cualquier definición); se limpian solas al liberarse el área.
     private final transient Set<UUID> spawnedMobEntities = new HashSet<>();
+
+    // --- Modo edición del área (GUI) ---
+    // Mientras está activo: la ventana de ingreso NO se dispara (caminar
+    // adentro no arranca el evento), y hay un armor stand marcador por cada
+    // mob mostrando su posición/equipo actual. Se prende al abrir el área en
+    // el GUI y se apaga con los botones "Guardar"/"Cancelar" del menú.
+    private transient boolean editMode = false;
+    private final transient Map<String, UUID> markerEntities = new HashMap<>();
 
     public DungeonArea(String name, String world, int x1, int y1, int z1, int x2, int y2, int z2) {
         this.name = name;
@@ -201,6 +210,18 @@ public class DungeonArea {
 
     public Set<UUID> getSpawnedMobEntities() {
         return spawnedMobEntities;
+    }
+
+    public boolean isEditMode() {
+        return editMode;
+    }
+
+    public void setEditMode(boolean editMode) {
+        this.editMode = editMode;
+    }
+
+    public Map<String, UUID> getMarkerEntities() {
+        return markerEntities;
     }
 
     /**
