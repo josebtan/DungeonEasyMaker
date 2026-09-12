@@ -202,27 +202,4 @@ public class GuiHolders {
             this.inventory = inventory;
         }
     }
-
-    /** Menú de puertas de entrada/salida de un área. */
-    public static class DoorMenuHolder implements InventoryHolder {
-        private final String areaName;
-        private Inventory inventory;
-
-        public DoorMenuHolder(String areaName) {
-            this.areaName = areaName;
-        }
-
-        public String getAreaName() {
-            return areaName;
-        }
-
-        @Override
-        public Inventory getInventory() {
-            return inventory;
-        }
-
-        public void setInventory(Inventory inventory) {
-            this.inventory = inventory;
-        }
-    }
 }
