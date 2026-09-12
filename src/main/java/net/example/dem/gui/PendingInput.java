@@ -18,7 +18,8 @@ public class PendingInput {
         SET_MOB_NAME,
         SET_MOB_TAG,
         SET_MOB_LOOT,
-        ADD_MOB_EFFECT
+        ADD_MOB_EFFECT,
+        CREATE_DOOR
     }
 
     private final Kind kind;
@@ -54,6 +55,10 @@ public class PendingInput {
     /** El "mobId" acá es el mob ORIGEN que se está clonando, no uno existente a editar. */
     public static PendingInput cloneMob(String areaName, String sourceMobId) {
         return new PendingInput(Kind.CLONE_MOB, areaName, null, sourceMobId, null);
+    }
+
+    public static PendingInput createDoor(String areaName) {
+        return new PendingInput(Kind.CREATE_DOOR, areaName, null, null, null);
     }
 
     public Kind getKind() {

@@ -102,8 +102,15 @@ Comportamiento automático que ya viene resuelto:
 
 ## Puertas de entrada/salida por etapa
 
-Cada área puede tener su propia puerta de entrada y de salida asignadas:
+Desde el GUI: menú del área → botón **"Puertas"**. Ahí, sin comandos:
+- **Entrada / Salida**: click izq/der cicla entre "ninguna" y las puertas ya
+  creadas de esa área, para elegir cuál cumple cada rol.
+- **Abrir/cerrar entrada** y **Abrir/cerrar salida**: click izq abre, click
+  der cierra, directo sobre la puerta asignada a ese rol.
+- **Crear puerta nueva**: marcá 2 esquinas con la varita sobre una puerta ya
+  construida (eso queda como su estado "cerrado") y ponele un id por chat.
 
+Por comando (equivalente):
 ```
 /dem area setentrydoor etapa1 puerta_entrada
 /dem area setexitdoor etapa1 puerta_1_2

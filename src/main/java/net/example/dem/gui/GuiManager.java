@@ -1,10 +1,12 @@
 package net.example.dem.gui;
 
 import net.example.dem.area.AreaManager;
+import net.example.dem.area.DoorDefinition;
 import net.example.dem.area.DungeonArea;
 import net.example.dem.area.SelectionListener;
 import net.example.dem.gui.GuiHolders.AreaMenuHolder;
 import net.example.dem.gui.GuiHolders.CommandListMenuHolder;
+import net.example.dem.gui.GuiHolders.DoorMenuHolder;
 import net.example.dem.gui.GuiHolders.MainMenuHolder;
 import net.example.dem.gui.GuiHolders.MobEditorMenuHolder;
 import net.example.dem.gui.GuiHolders.MobEquipMenuHolder;
@@ -17,6 +19,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
@@ -138,7 +142,8 @@ public class GuiManager {
                 || holder instanceof MobListMenuHolder
                 || holder instanceof MobTypePickerHolder
                 || holder instanceof MobEditorMenuHolder
-                || holder instanceof MobEquipMenuHolder;
+                || holder instanceof MobEquipMenuHolder
+                || holder instanceof DoorMenuHolder;
     }
 
     /**
@@ -286,6 +291,13 @@ public class GuiManager {
                         ChatColor.GRAY + "Aparecen junto con los comandos",
                         ChatColor.GRAY + "de arranque, en su posición fija."),
                 "open_mobs", area.getName(), null));
+
+        inv.setItem(17, buildItem(Material.OAK_DOOR,
+                ChatColor.AQUA + "Puertas (" + area.getDoorsById().size() + ")",
+                List.of(ChatColor.GRAY + "Puerta de entrada: " + (area.getEntryDoorId() == null ? "(ninguna)" : area.getEntryDoorId()),
+                        ChatColor.GRAY + "Puerta de salida: " + (area.getExitDoorId() == null ? "(ninguna)" : area.getExitDoorId()),
+                        ChatColor.YELLOW + "Click para configurar"),
+                "open_doors", area.getName(), null));
 
         inv.setItem(20, buildItem(Material.CLOCK,
                 ChatColor.GOLD + "Ventana de ingreso: " + area.getJoinWindowSeconds() + "s",
@@ -824,6 +836,76 @@ public class GuiManager {
     }
 
     // ----------------------------------------------------------------
+    // Menú de puertas de entrada/salida de un área
+    // ----------------------------------------------------------------
+
+    public void openDoorMenu(Player player, String areaName) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+
+        Inventory inv = Bukkit.createInventory(new DoorMenuHolder(area.getName()), 27,
+                ChatColor.DARK_PURPLE + "Puertas: " + area.getName());
+        ((DoorMenuHolder) inv.getHolder()).setInventory(inv);
+
+        inv.setItem(10, buildItem(Material.LIME_DYE,
+                ChatColor.GREEN + "Entrada: " + (area.getEntryDoorId() == null ? "(ninguna)" : area.getEntryDoorId()),
+                List.of(ChatColor.GRAY + "Se cierra sola al arrancar el evento.",
+                        ChatColor.YELLOW + "Click izq/der: elegir puerta"),
+                "cycle_entry", area.getName(), null));
+        inv.setItem(11, buildItem(Material.IRON_DOOR, ChatColor.AQUA + "Abrir/cerrar entrada",
+                List.of(ChatColor.YELLOW + "Click izq: abrir   Click der: cerrar"),
+                "toggle_entry", area.getName(), null));
+
+        inv.setItem(15, buildItem(Material.ORANGE_DYE,
+                ChatColor.GOLD + "Salida: " + (area.getExitDoorId() == null ? "(ninguna)" : area.getExitDoorId()),
+                List.of(ChatColor.GRAY + "La abrís vos desde el on-complete",
+                        ChatColor.GRAY + "del objetivo (dem area door openexit).",
+                        ChatColor.YELLOW + "Click izq/der: elegir puerta"),
+                "cycle_exit", area.getName(), null));
+        inv.setItem(16, buildItem(Material.IRON_DOOR, ChatColor.AQUA + "Abrir/cerrar salida",
+                List.of(ChatColor.YELLOW + "Click izq: abrir   Click der: cerrar"),
+                "toggle_exit", area.getName(), null));
+
+        List<String> allDoorsLore = new ArrayList<>();
+        if (area.getDoorsById().isEmpty()) {
+            allDoorsLore.add(ChatColor.GRAY + "(esta área todavía no tiene puertas)");
+        } else {
+            for (DoorDefinition door : area.getDoorsById().values()) {
+                allDoorsLore.add(ChatColor.GRAY + " - " + door.getId() + " (" + door.getBlockCount() + " bloques)");
+            }
+        }
+        inv.setItem(13, buildItem(Material.BOOK, ChatColor.WHITE + "Puertas de esta área", allDoorsLore, "noop", null, null));
+
+        inv.setItem(22, buildItem(Material.EMERALD, ChatColor.GREEN + "Crear puerta nueva",
+                List.of(ChatColor.GRAY + "Marcá 2 esquinas con la varita",
+                        ChatColor.GRAY + "sobre una puerta ya construida",
+                        ChatColor.GRAY + "(eso queda como su estado 'cerrado').",
+                        ChatColor.YELLOW + "Click para empezar"),
+                "create_door", area.getName(), null));
+
+        inv.setItem(18, buildItem(Material.ARROW, ChatColor.WHITE + "« Volver", List.of(), "back_area", area.getName(), null));
+
+        player.openInventory(inv);
+    }
+
+    /** Ciclo circular entre "ninguna" y cada puerta de la área, para elegir entrada/salida sin escribir nada. */
+    private String cycleDoorId(DungeonArea area, String current, boolean forward) {
+        List<String> options = new ArrayList<>();
+        options.add(null); // "ninguna"
+        for (DoorDefinition door : area.getDoorsById().values()) {
+            options.add(door.getId());
+        }
+        int idx = options.indexOf(current);
+        if (idx < 0) idx = 0;
+        int next = forward ? (idx + 1) % options.size() : (idx - 1 + options.size()) % options.size();
+        return options.get(next);
+    }
+
+    // ----------------------------------------------------------------
     // Manejo de clicks
     // ----------------------------------------------------------------
 
@@ -855,6 +937,8 @@ public class GuiManager {
             handleMobEditorAction(player, h.getAreaName(), h.getMobId(), action, event);
         } else if (holder instanceof MobEquipMenuHolder h) {
             handleMobEquipAction(player, h.getAreaName(), h.getMobId(), action);
+        } else if (holder instanceof DoorMenuHolder h) {
+            handleDoorMenuAction(player, h.getAreaName(), action, event);
         }
     }
 
@@ -925,6 +1009,7 @@ public class GuiManager {
             case "open_leave" -> openCommandListMenu(player, areaName, CommandListType.LEAVE);
             case "open_start" -> openCommandListMenu(player, areaName, CommandListType.START);
             case "open_mobs" -> openMobListMenu(player, areaName);
+            case "open_doors" -> openDoorMenu(player, areaName);
             case "window" -> {
                 int delta = event.isShiftClick() ? 30 : 5;
                 if (event.isRightClick()) delta = -delta;
@@ -1231,6 +1316,129 @@ public class GuiManager {
         openMobEditorMenu(player, areaName, mobId);
     }
 
+    private void handleDoorMenuAction(Player player, String areaName, String action, InventoryClickEvent event) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            openMainMenu(player);
+            return;
+        }
+
+        boolean forward = event.isLeftClick();
+
+        switch (action) {
+            case "back_area" -> openAreaMenu(player, areaName);
+            case "cycle_entry" -> {
+                area.setEntryDoorId(cycleDoorId(area, area.getEntryDoorId(), forward));
+                areaManager.save();
+                openDoorMenu(player, areaName);
+            }
+            case "cycle_exit" -> {
+                area.setExitDoorId(cycleDoorId(area, area.getExitDoorId(), forward));
+                areaManager.save();
+                openDoorMenu(player, areaName);
+            }
+            case "toggle_entry" -> {
+                DoorDefinition door = area.getEntryDoor();
+                if (door == null) {
+                    player.sendMessage(ChatColor.RED + "'" + area.getName() + "' no tiene puerta de entrada asignada.");
+                } else if (event.isRightClick()) {
+                    door.close();
+                    player.sendMessage(ChatColor.GREEN + "Puerta de entrada (" + door.getId() + ") cerrada.");
+                } else {
+                    door.open();
+                    player.sendMessage(ChatColor.GREEN + "Puerta de entrada (" + door.getId() + ") abierta.");
+                }
+            }
+            case "toggle_exit" -> {
+                DoorDefinition door = area.getExitDoor();
+                if (door == null) {
+                    player.sendMessage(ChatColor.RED + "'" + area.getName() + "' no tiene puerta de salida asignada.");
+                } else if (event.isRightClick()) {
+                    door.close();
+                    player.sendMessage(ChatColor.GREEN + "Puerta de salida (" + door.getId() + ") cerrada.");
+                } else {
+                    door.open();
+                    player.sendMessage(ChatColor.GREEN + "Puerta de salida (" + door.getId() + ") abierta.");
+                }
+            }
+            case "create_door" -> handleCreateDoorButton(player, areaName);
+            default -> { }
+        }
+    }
+
+    private void handleCreateDoorButton(Player player, String areaName) {
+        Location pos1 = selectionListener.getPos1(player.getUniqueId());
+        Location pos2 = selectionListener.getPos2(player.getUniqueId());
+
+        if (pos1 == null || pos2 == null) {
+            player.getInventory().addItem(selectionListener.createWand());
+            player.closeInventory();
+            player.sendMessage(ChatColor.YELLOW + "Marcá las 2 esquinas de la puerta (ya construida) con la "
+                    + "varita y abrí el menú de nuevo para ponerle nombre.");
+            return;
+        }
+        if (pos1.getWorld() == null || !pos1.getWorld().equals(pos2.getWorld())) {
+            player.sendMessage(ChatColor.RED + "Las dos esquinas deben estar en el mismo mundo.");
+            return;
+        }
+
+        pendingInputs.put(player.getUniqueId(), PendingInput.createDoor(areaName));
+        player.closeInventory();
+        player.sendMessage(ChatColor.GREEN + "Escribí en el chat el id para la puerta nueva, o 'cancelar'.");
+    }
+
+    private void createDoorFromChat(Player player, String areaName, String id) {
+        DungeonArea area = areaManager.getArea(areaName);
+        if (area == null) {
+            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
+            return;
+        }
+        if (id.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "El id no puede estar vacío.");
+            openDoorMenu(player, areaName);
+            return;
+        }
+        if (area.getDoor(id) != null) {
+            player.sendMessage(ChatColor.RED + "Ya existe una puerta '" + id + "' en esta área.");
+            openDoorMenu(player, areaName);
+            return;
+        }
+
+        Location pos1 = selectionListener.getPos1(player.getUniqueId());
+        Location pos2 = selectionListener.getPos2(player.getUniqueId());
+        if (pos1 == null || pos2 == null || pos1.getWorld() == null || !pos1.getWorld().equals(pos2.getWorld())) {
+            player.sendMessage(ChatColor.RED + "Perdiste la selección de esquinas, marcá de nuevo con la varita.");
+            openDoorMenu(player, areaName);
+            return;
+        }
+
+        World world = pos1.getWorld();
+        int minX = Math.min(pos1.getBlockX(), pos2.getBlockX());
+        int minY = Math.min(pos1.getBlockY(), pos2.getBlockY());
+        int minZ = Math.min(pos1.getBlockZ(), pos2.getBlockZ());
+        int maxX = Math.max(pos1.getBlockX(), pos2.getBlockX());
+        int maxY = Math.max(pos1.getBlockY(), pos2.getBlockY());
+        int maxZ = Math.max(pos1.getBlockZ(), pos2.getBlockZ());
+
+        List<DoorDefinition.CapturedBlock> blocks = new ArrayList<>();
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    blocks.add(new DoorDefinition.CapturedBlock(x, y, z, block.getBlockData().getAsString()));
+                }
+            }
+        }
+
+        DoorDefinition door = new DoorDefinition(id, world.getName(), minX, minY, minZ, maxX, maxY, maxZ, blocks);
+        area.addDoor(door);
+        areaManager.save();
+        player.sendMessage(ChatColor.GREEN + "Puerta '" + id + "' creada (" + blocks.size()
+                + " bloques capturados como estado cerrado).");
+        openDoorMenu(player, areaName);
+    }
+
     // ----------------------------------------------------------------
     // Captura de chat (nombre de área nueva / comando nuevo)
     // ----------------------------------------------------------------
@@ -1255,6 +1463,7 @@ public class GuiManager {
             case SET_MOB_TAG -> setMobTagFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
             case SET_MOB_LOOT -> setMobLootFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
             case ADD_MOB_EFFECT -> addMobEffectFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
+            case CREATE_DOOR -> createDoorFromChat(player, pending.getAreaName(), message.trim());
         }
     }
 
