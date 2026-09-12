@@ -146,9 +146,14 @@ tipo (huevo de spawn) → se crea al toque, en la posición donde estás parado,
 con un id automático (`mob1`, `mob2`...) y **etiqueta = nombre del área**
 (para que el objetivo se arme solo). Se abre su editor directo.
 
-**Clonar un mob**: en la lista, **click derecho** sobre uno existente (no
-shift, para que funcione en Bedrock/Geyser) → pedí el id nuevo por chat,
-parado en la posición donde va la copia.
+**Clonar un mob**: en la lista, **click derecho** sobre uno existente lo
+clona al toque (mismo equipo, vida, efectos) en tu posición actual, con el
+siguiente id de la secuencia — sin pedir nada por chat.
+
+**Equipamiento**: pantalla tipo "personaje" — columna de casco/pecho/piernas/
+botas a la izquierda, mano/mano secundaria abajo al medio, y un ícono de
+armor stand en el centro a modo de vista previa (así queda equipado el
+marcador que ves en el mundo).
 
 **Click físico en el armor stand**: además de desde el GUI, podés
 click-derecho el armor stand en el mundo para abrir el editor de ese mob. Si

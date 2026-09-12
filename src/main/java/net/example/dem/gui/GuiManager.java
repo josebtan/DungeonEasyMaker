@@ -60,15 +60,18 @@ public class GuiManager {
     private static final String NAMESPACE = "dungeoncore";
 
     // Posiciones fijas del "muñeco de papel" en el editor de equipamiento.
+    // Layout tipo "pantalla de personaje" (como el inventario del jugador):
+    // columna de armadura a la izquierda, manos abajo, "muñeco" al medio.
     private static final Map<Integer, EquipmentSlot> EQUIP_SLOT_POSITIONS = new LinkedHashMap<>();
     static {
-        EQUIP_SLOT_POSITIONS.put(10, EquipmentSlot.HEAD);
-        EQUIP_SLOT_POSITIONS.put(11, EquipmentSlot.CHEST);
-        EQUIP_SLOT_POSITIONS.put(12, EquipmentSlot.LEGS);
-        EQUIP_SLOT_POSITIONS.put(13, EquipmentSlot.FEET);
-        EQUIP_SLOT_POSITIONS.put(15, EquipmentSlot.HAND);
-        EQUIP_SLOT_POSITIONS.put(16, EquipmentSlot.OFF_HAND);
+        EQUIP_SLOT_POSITIONS.put(1, EquipmentSlot.HEAD);
+        EQUIP_SLOT_POSITIONS.put(10, EquipmentSlot.CHEST);
+        EQUIP_SLOT_POSITIONS.put(19, EquipmentSlot.LEGS);
+        EQUIP_SLOT_POSITIONS.put(28, EquipmentSlot.FEET);
+        EQUIP_SLOT_POSITIONS.put(30, EquipmentSlot.HAND);
+        EQUIP_SLOT_POSITIONS.put(32, EquipmentSlot.OFF_HAND);
     }
+    private static final int[] EQUIP_PREVIEW_SLOTS = {13, 22};
 
     // Tipos de entidad elegibles para el selector de "crear mob" (con huevo de
     // spawn o no): cualquier entidad viva, salvo jugadores, armor stands y
@@ -814,19 +817,33 @@ public class GuiManager {
             return;
         }
 
-        Inventory inv = Bukkit.createInventory(new MobEquipMenuHolder(area.getName(), mob.getId()), 27,
+        // Layout tipo "pantalla de personaje": columna de armadura a la
+        // izquierda, manos abajo al medio, y un armor stand de mentira en el
+        // medio (el mismo look que ves en el mundo con el marcador real).
+        Inventory inv = Bukkit.createInventory(new MobEquipMenuHolder(area.getName(), mob.getId()), 45,
                 ChatColor.DARK_PURPLE + "Equipo: " + mob.getId());
         ((MobEquipMenuHolder) inv.getHolder()).setInventory(inv);
 
         ItemStack filler = buildItem(Material.GRAY_STAINED_GLASS_PANE, " ", List.of(), "noop", null, null);
-        for (int i = 0; i < 27; i++) {
+        for (int i = 0; i < 45; i++) {
             inv.setItem(i, filler.clone());
         }
+
         for (Map.Entry<Integer, EquipmentSlot> entry : EQUIP_SLOT_POSITIONS.entrySet()) {
             ItemStack current = mob.getEquipment().get(entry.getValue());
             inv.setItem(entry.getKey(), current != null ? current.clone() : new ItemStack(Material.AIR));
         }
-        inv.setItem(22, buildItem(Material.LIME_DYE, ChatColor.GREEN + "Guardar y volver",
+
+        String display = mob.getDisplayName() != null ? mob.getDisplayName() : mob.getId();
+        ItemStack preview = buildItem(Material.ARMOR_STAND, ChatColor.YELLOW + display,
+                List.of(ChatColor.GRAY + "Así queda equipado el marcador",
+                        ChatColor.GRAY + "que ves en el mundo mientras editás."),
+                "noop", null, null);
+        for (int slot : EQUIP_PREVIEW_SLOTS) {
+            inv.setItem(slot, preview.clone());
+        }
+
+        inv.setItem(40, buildItem(Material.LIME_DYE, ChatColor.GREEN + "Guardar y volver",
                 List.of(ChatColor.GRAY + "Guarda lo que haya en cada slot",
                         ChatColor.GRAY + "(casco, pecho, piernas, botas,",
                         ChatColor.GRAY + "mano, mano secundaria)"),
@@ -1102,10 +1119,13 @@ public class GuiManager {
             case "back_area" -> openAreaMenu(player, areaName);
             case "open_mob" -> {
                 if (event.isRightClick()) {
-                    pendingInputs.put(player.getUniqueId(), PendingInput.cloneMob(areaName, mobId));
-                    player.closeInventory();
-                    player.sendMessage(ChatColor.GREEN + "Parate en la posición donde va la copia y escribí "
-                            + "el id para '" + mobId + "' en el chat, o 'cancelar'.");
+                    MobSpawnDefinition source = area.getMob(mobId);
+                    if (source == null) {
+                        player.sendMessage(ChatColor.RED + "Ese mob ya no existe.");
+                        openMobListMenu(player, areaName);
+                    } else {
+                        cloneMobInstant(player, area, source);
+                    }
                 } else {
                     openMobEditorMenu(player, areaName, mobId);
                 }
@@ -1165,6 +1185,23 @@ public class GuiManager {
         player.sendMessage(ChatColor.GREEN + "Mob '" + id + "' (" + prettyName(type)
                 + ") creado en tu posición actual, con etiqueta '" + area.getName() + "'.");
         openMobEditorMenu(player, area.getName(), id);
+    }
+
+    /**
+     * Clona un mob al toque: sin pedir id (se autoasigna el siguiente en
+     * orden secuencial, igual que al crear uno nuevo). Copia todos sus
+     * atributos y lo ubica en la posición ACTUAL del jugador.
+     */
+    private void cloneMobInstant(Player player, DungeonArea area, MobSpawnDefinition source) {
+        String newId = nextMobId(area);
+        MobSpawnDefinition clone = source.copyWithNewId(newId);
+        clone.setSpawnLocation(player.getLocation());
+        area.addMob(clone);
+        areaManager.save();
+        spawnOrRefreshMarker(area, clone);
+        player.sendMessage(ChatColor.GREEN + "Mob '" + newId + "' creado como copia de '" + source.getId()
+                + "' en tu posición actual.");
+        openMobEditorMenu(player, area.getName(), newId);
     }
 
     private void handleMobEditorAction(Player player, String areaName, String mobId, String action, InventoryClickEvent event) {
@@ -1458,7 +1495,6 @@ public class GuiManager {
             case CREATE_AREA -> createAreaFromChat(player, message.trim());
             case ADD_COMMAND -> addCommandFromChat(player, pending.getAreaName(), pending.getListType(), message);
             case CREATE_MOB -> createMobFromChat(player, pending.getAreaName(), pending.getMobType(), message.trim());
-            case CLONE_MOB -> cloneMobFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
             case SET_MOB_NAME -> setMobNameFromChat(player, pending.getAreaName(), pending.getMobId(), message);
             case SET_MOB_TAG -> setMobTagFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
             case SET_MOB_LOOT -> setMobLootFromChat(player, pending.getAreaName(), pending.getMobId(), message.trim());
@@ -1527,35 +1563,6 @@ public class GuiManager {
         areaManager.save();
         player.sendMessage(ChatColor.GREEN + "Mob '" + id + "' (" + type + ") creado. Ahora fijale una posición "
                 + "parándote donde querés que aparezca.");
-        openMobEditorMenu(player, areaName, id);
-    }
-
-    private void cloneMobFromChat(Player player, String areaName, String sourceMobId, String newId) {
-        DungeonArea area = areaManager.getArea(areaName);
-        if (area == null) {
-            player.sendMessage(ChatColor.RED + "Esa área ya no existe.");
-            return;
-        }
-        MobSpawnDefinition source = area.getMob(sourceMobId);
-        if (source == null) {
-            player.sendMessage(ChatColor.RED + "El mob original ya no existe.");
-            openMobListMenu(player, areaName);
-            return;
-        }
-        String id = newId.split("\\s+")[0];
-        if (id.isEmpty() || area.getMob(id) != null) {
-            player.sendMessage(ChatColor.RED + "Id inválido o ya usado en esta área.");
-            openMobListMenu(player, areaName);
-            return;
-        }
-
-        MobSpawnDefinition clone = source.copyWithNewId(id);
-        clone.setSpawnLocation(player.getLocation()); // se clona parado en la posición nueva
-        area.addMob(clone);
-        areaManager.save();
-        spawnOrRefreshMarker(area, clone);
-        player.sendMessage(ChatColor.GREEN + "Mob '" + id + "' creado como copia de '" + sourceMobId
-                + "' (mismo equipo, vida y efectos) en tu posición actual.");
         openMobEditorMenu(player, areaName, id);
     }
 
