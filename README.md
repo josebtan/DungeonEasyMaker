@@ -109,16 +109,25 @@ Desde el GUI: menú del área → botón **"Puertas"**. Ahí, sin comandos:
   der cierra, directo sobre la puerta asignada a ese rol.
 - **Crear puerta nueva**: marcá 2 esquinas con la varita sobre una puerta ya
   construida (eso queda como su estado "cerrado") y ponele un id por chat.
+  **Queda ABIERTA apenas se crea** (lista para usarse de entrada); se cierra
+  recién cuando arranca el evento.
+
+Ciclo de vida de cada rol:
+- **Entrada**: arranca (o vuelve a quedar) ABIERTA por defecto — apenas la
+  asignás a una etapa (o creás una nueva), se abre sola. Se **cierra sola**
+  al arrancar el evento de esa etapa (cuando cierra su ventana de ingreso), y
+  se **reabre sola** cuando se completan todas las etapas del dungeon o
+  cuando mueren/se van todos los participantes.
+- **Salida**: no se toca automáticamente al arrancar ni al terminar el
+  dungeon — la abrís vos desde el on-complete del objetivo, cuando se supera
+  la etapa. El botón **"Meta automática"** ya arma esa línea completa por vos
+  si la etapa tiene una puerta de salida asignada.
 
 Por comando (equivalente):
 ```
 /dem area setentrydoor etapa1 puerta_entrada
 /dem area setexitdoor etapa1 puerta_1_2
 ```
-
-La de entrada se **cierra sola** al arrancar el evento de esa etapa (cuando
-cierra su ventana de ingreso). La de salida la abrís vos a mano desde el
-on-complete del objetivo:
 ```
 /dem area door openexit etapa1
 ```
@@ -126,6 +135,11 @@ on-complete del objetivo:
 
 Ya no hace falta `/dem dungeon setentrance`: la entrada del dungeon completo
 es automáticamente la puerta de entrada de su primera etapa.
+
+> Si ya habías usado "Meta automática" antes de esta actualización, esa línea
+> vieja en Comandos de arranque no incluye el paso de abrir la salida —
+> borrala (en el menú Comandos de arranque) y volvé a apretar el botón, o
+> agregale manualmente `dem area door openexit <área>` con "Agregar comando".
 
 ## Editor de mobs: modo edición con armor stand
 

@@ -111,10 +111,11 @@ public class DoorConfigModule {
 
         DoorDefinition door = new DoorDefinition(id, world.getName(), minX, minY, minZ, maxX, maxY, maxZ, blocks);
         area.addDoor(door);
+        door.open(); // por defecto arranca abierta; se cierra sola recién al arrancar el evento
         areaManager.save();
         sender.sendMessage(ChatColor.GREEN + "Puerta '" + id + "' creada en '" + area.getName() + "' ("
-                + blocks.size() + " bloques capturados como estado cerrado). Usá /dem area door open/close "
-                + area.getName() + " " + id + " para manejarla.");
+                + blocks.size() + " bloques capturados como estado cerrado) y dejada ABIERTA por defecto. "
+                + "Usá /dem area door open/close " + area.getName() + " " + id + " para manejarla.");
         return true;
     }
 

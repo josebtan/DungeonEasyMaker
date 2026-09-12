@@ -294,6 +294,9 @@ public class AreaModule {
         }
         if (entry) {
             area.setEntryDoorId(doorId);
+            if (doorId != null) {
+                area.getDoor(doorId).open(); // la de entrada arranca abierta por defecto
+            }
         } else {
             area.setExitDoorId(doorId);
         }
@@ -304,7 +307,7 @@ public class AreaModule {
         } else {
             sender.sendMessage(ChatColor.GREEN + "Puerta de " + (entry ? "entrada" : "salida") + " de '"
                     + area.getName() + "' establecida en '" + doorId + "'"
-                    + (entry ? " (se va a cerrar sola al arrancar el evento)." : "."));
+                    + (entry ? " (abierta ahora; se va a cerrar sola al arrancar el evento)." : "."));
         }
         return true;
     }

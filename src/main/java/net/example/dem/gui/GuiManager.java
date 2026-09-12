@@ -309,8 +309,9 @@ public class GuiManager {
         long taggedCount = area.getMobs().stream().filter(m -> area.getName().equalsIgnoreCase(m.getTag())).count();
         inv.setItem(24, buildItem(Material.TARGET, ChatColor.GOLD + "Meta automática",
                 List.of(ChatColor.GRAY + "Mobs con etiqueta '" + area.getName() + "': " + taggedCount,
-                        ChatColor.GRAY + "Click agrega el objetivo (matarlos",
-                        ChatColor.GRAY + "a todos) a Comandos de arranque."),
+                        ChatColor.GRAY + "Puerta de salida asignada: " + (area.getExitDoorId() == null ? "no" : area.getExitDoorId()),
+                        ChatColor.GRAY + "Click agrega el objetivo a Comandos de arranque",
+                        ChatColor.GRAY + "(y abre la puerta de salida si hay una asignada)."),
                 "auto_goal", area.getName(), null));
 
         inv.setItem(22, buildItem(Material.GLOWSTONE, ChatColor.YELLOW + "Modo edición: ACTIVO",
@@ -1040,13 +1041,22 @@ public class GuiManager {
                     player.sendMessage(ChatColor.RED + "Ningún mob tiene la etiqueta '" + area.getName()
                             + "' todavía (se pone sola al crearlos desde este menú).");
                 } else {
-                    String cmd = "dem objective watch " + area.getName() + " " + count
-                            + " broadcast &a¡" + area.getName() + " superada!";
-                    area.getStartCommands().add(cmd);
+                    StringBuilder cmd = new StringBuilder("dem objective watch " + area.getName() + " " + count
+                            + " broadcast &a¡" + area.getName() + " superada!");
+                    if (area.getExitDoorId() != null) {
+                        cmd.append("~~dem area door openexit ").append(area.getName());
+                    }
+                    area.getStartCommands().add(cmd.toString());
                     areaManager.save();
                     player.sendMessage(ChatColor.GREEN + "Agregado a Comandos de arranque: " + cmd);
-                    player.sendMessage(ChatColor.GRAY + "Editalo ahí (Comandos de arranque) si querés sumarle "
-                            + "abrir una puerta u otro efecto al completarse.");
+                    if (area.getExitDoorId() == null) {
+                        player.sendMessage(ChatColor.GRAY + "Esta área todavía no tiene puerta de salida asignada "
+                                + "(menú Puertas), así que no se agregó ningún 'abrir puerta'. Si es la última "
+                                + "etapa de un dungeon, agregá manualmente '~dem dungeon complete <id>'.");
+                    } else {
+                        player.sendMessage(ChatColor.GRAY + "Incluye abrir la puerta de salida asignada. Si es la "
+                                + "última etapa de un dungeon, agregale además 'dem dungeon complete <id>'.");
+                    }
                 }
                 openAreaMenu(player, areaName);
             }
@@ -1367,6 +1377,9 @@ public class GuiManager {
             case "back_area" -> openAreaMenu(player, areaName);
             case "cycle_entry" -> {
                 area.setEntryDoorId(cycleDoorId(area, area.getEntryDoorId(), forward));
+                if (area.getEntryDoor() != null) {
+                    area.getEntryDoor().open(); // la de entrada arranca abierta por defecto
+                }
                 areaManager.save();
                 openDoorMenu(player, areaName);
             }
@@ -1470,9 +1483,10 @@ public class GuiManager {
 
         DoorDefinition door = new DoorDefinition(id, world.getName(), minX, minY, minZ, maxX, maxY, maxZ, blocks);
         area.addDoor(door);
+        door.open(); // por defecto arranca abierta; se cierra sola recién al arrancar el evento
         areaManager.save();
         player.sendMessage(ChatColor.GREEN + "Puerta '" + id + "' creada (" + blocks.size()
-                + " bloques capturados como estado cerrado).");
+                + " bloques capturados como estado cerrado) y dejada ABIERTA por defecto.");
         openDoorMenu(player, areaName);
     }
 
